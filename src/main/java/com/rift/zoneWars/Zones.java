@@ -1,12 +1,6 @@
 package com.rift.zoneWars;
 
-import java.util.ArrayList;
-
 public class Zones {
-    public class Zone {
+    // Zone size: 2x2 chunks
 
-    }
-    public ArrayList<Zone> generateZones(int teams) {
-
-    }
 }

@@ -1,5 +1,6 @@
 package com.rift.zoneWars;
 
+import com.rift.zoneWars.ZoneWars;
 import org.bukkit.Location;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -20,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class PluginData {
     private final ZoneWars plugin;
     private JSONObject data;
-    private final JSONObject defaultEntry = new JSONObject("{\"teams\":[],\"zones\":[]}");
+    private final JSONObject defaultEntry = new JSONObject("{\"teams\":[],\"Territories\":[]}");
     private final Path dataFilePath;
 
     public PluginData(ZoneWars plugin) {
@@ -34,8 +35,9 @@ public class PluginData {
      *   "teams": [
      *     {"name": "Team 1", "color": 0, "members": [{"username": "Test1", "uuid": "d083b954-a81a-4e3f-8a5a-0629f3c13028"}, {"username": "Test2", "uuid": "281469bf-2016-4296-9470-1a2aa310d899"}]}
      *   ]
-     *   "zones": [
-     *     {"world": "world", "chunk_region_x": 0, "chunk_region_z": 0, "team": 0}
+     *   "territories": [
+     *     {"world": "world", "chunk_region_x": 0, "chunk_region_z": 0, "team": 0, "capital": false} // The territory from (0, 0) to (31, 31)
+     *     {"world": "world", "chunk_region_x": 2, "chunk_region_z": 2, "team": 0, "capital": false} // The territory from (32, 32) to (63, 63)
      *   ]
      * }
      */
@@ -120,48 +122,55 @@ public class PluginData {
         return foundTeam.get();
     }
 
-    public JSONArray getZones() {
+    public JSONArray getTerritories() {
         readData();
-        return data.getJSONArray("zones");
-    }
-
-    public JSONArray getTeamZones(int teamIdx) {
-        return getZones().getJSONArray(teamIdx);
+        return data.getJSONArray("territories");
     }
 
     /**
-     * Finds and returns the capital zone of a team.
+     * Finds and returns the territories that a team has
+     * @param teamIdx
+     * @return A JSONArray containing a list of a team's territory. If they have none, returns an empty JSONArray
+     */
+    public JSONArray getTeamTerritories(int teamIdx) {
+        JSONArray teamTerritories = new JSONArray();
+        getTerritories().forEach(obj -> {
+           if (((JSONObject) obj).getInt("team") == teamIdx) {
+                teamTerritories.put(obj);
+           }
+        });
+        return teamTerritories;
+    }
+
+    /**
+     * Finds and returns the capital territory of a team.
      *
      * @param teamIdx Team index
-     * @return A JSONObject with info of the zone the player is in. If multiple zones meet the criteria, it will return the last entry in the list.
+     * @return A JSONObject with info of the territory the player is in. If multiple territories meet the criteria, it will return the last entry in the list. If the team does not have a capital territory, it returns an empty JSONObject.
      */
-    public JSONObject getCapitalZone(int teamIdx) {
-        final JSONObject[] foundZone = {new JSONObject()};
-        getTeamZones(teamIdx).forEach(obj -> {
+    public JSONObject getCapitalTerritory(int teamIdx) {
+        final JSONObject[] foundTerritory = {new JSONObject()};
+        getTeamTerritories(teamIdx).forEach(obj -> {
             if (((JSONObject) obj).getBoolean("capital")) {
-                foundZone[0] = (JSONObject) obj;
+                foundTerritory[0] = (JSONObject) obj;
             }
         });
-        return foundZone[0];
+        return foundTerritory[0];
     }
 
     /**
-     * Finds and returns the zone in the specified location
+     * Finds and returns the territory in the specified location
      *
      * @param location a location class
-     * @return A JSONObject with info of the zone the player is in. If it cannot find a zone, it will return a new JSONObject.
+     * @return A JSONObject with info of the territory the player is in. If it cannot find a territory, it will return a new JSONObject.
      */
-    public JSONObject findZoneFromLocation(Location location) {
-        for (int i = 0; i < getZones().length(); i++) {
-            JSONArray teamZones = getZones().getJSONArray(i);
-            for (int j = 0; j < teamZones.length(); j++) {
-                JSONObject teamZone = teamZones.getJSONObject(j);
-                if (!Objects.equals(teamZone.getString("world"), location.getWorld().getName())) continue;
-                if (location.getX() < teamZone.getInt("max_x") && location.getX() > teamZone.getInt("min_x")) {
-                    if (location.getZ() < teamZone.getInt("max_z") && location.getZ() > teamZone.getInt("min_z")) {
-                        teamZone.put("team", i);
-                        return teamZone;
-                    }
+    public JSONObject findTerritoryFromLocation(Location location) {
+        for (int i = 0; i < getTerritories().length(); i++) {
+            JSONObject territory = getTerritories().getJSONObject(i);
+            if (!location.getWorld().getName().equals(territory.getString("world"))) continue;
+            if (location.getX() >= territory.getInt("chunk_region_x") * 16 && location.getX() <= territory.getInt("chunk_region_x") * 16 + 31) {
+                if (location.getZ() >= territory.getInt("chunk_region_z") * 16 && location.getZ() <= territory.getInt("chunk_region_z") * 16 + 31) {
+                    return territory;
                 }
             }
         }
