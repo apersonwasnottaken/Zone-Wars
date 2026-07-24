@@ -1,6 +1,8 @@
 package com.rift.zoneWars;
 
 import com.rift.zoneWars.ZoneWars;
+import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -23,9 +25,11 @@ public class PluginData {
     private JSONObject data;
     private final JSONObject defaultEntry = new JSONObject("{\"teams\":[],\"Territories\":[]}");
     private final Path dataFilePath;
+    private final ComponentLogger logger;
 
     public PluginData(ZoneWars plugin) {
         this.plugin = plugin;
+        this.logger = plugin.getComponentLogger();
         this.dataFilePath = Path.of(plugin.getDataFolder().getAbsolutePath() + "/data.json");
     }
 
@@ -36,7 +40,7 @@ public class PluginData {
      *     {"name": "Team 1", "color": 0, "members": [{"username": "Test1", "uuid": "d083b954-a81a-4e3f-8a5a-0629f3c13028"}, {"username": "Test2", "uuid": "281469bf-2016-4296-9470-1a2aa310d899"}]}
      *   ]
      *   "territories": [
-     *     {"world": "world", "chunk_region_x": 0, "chunk_region_z": 0, "team": 0, "capital": false} // The territory from (0, 0) to (31, 31)
+     *     {"world": "world", "chunk_region_x": 0, "chunk_region_z": 0, "team": -1, "capital": false} // Team of -1 means no one claimed it (and no one can claim it)
      *     {"world": "world", "chunk_region_x": 2, "chunk_region_z": 2, "team": 0, "capital": false} // The territory from (32, 32) to (63, 63)
      *   ]
      * }
@@ -127,6 +131,10 @@ public class PluginData {
         return data.getJSONArray("territories");
     }
 
+    public void updateTerritories(JSONArray newTerritories) {
+        data.put("territories", newTerritories);
+    }
+
     /**
      * Finds and returns the territories that a team has
      * @param teamIdx
@@ -175,5 +183,27 @@ public class PluginData {
             }
         }
         return new JSONObject();
+    }
+
+    public boolean territoryValidator(JSONObject territory) {
+        return territory.has("world") && territory.has("chunk_region_x") && territory.has("chunk_region_z") && territory.has("team") && territory.has("capital");
+    }
+
+    public void updateTerritory(JSONObject newData) {
+        if (!territoryValidator(newData)) {
+            logger.warn(MiniMessage.miniMessage().deserialize("Invalid territory data received while trying to update! " + newData));
+            return;
+        }
+        for (int i = 0; i < getTerritories().length(); i++) {
+            JSONObject territory = getTerritories().getJSONObject(i);
+            // Checks world and position only.
+            if (territory.getString("world") == newData.getString("world")) {
+                if (territory.getString("chunk_region_x") == newData.getString("chunk_region_x")) {
+                    if (territory.getString("chunk_region_z") == newData.getString("chunk_region_z")) {
+                        updateTerritories(getTerritories().put(i, newData));
+                    }
+                }
+            }
+        }
     }
 }

@@ -3,7 +3,6 @@ package com.rift.zoneWars;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ZoneWars extends JavaPlugin {
-
     /*
      * Zone Wars
      * The map is split up equally among all teams
@@ -24,10 +23,22 @@ public final class ZoneWars extends JavaPlugin {
      * Less territory = Less hearts (Cap: -9.5 max hearts)
      */
 
+    /*
+     * To-do list:
+     * Teams system
+     * Automatic territory definition
+     * Perks and nerfs for varied amounts of territory
+     * Capital territories
+     * Claiming territory
+     */
+
+    private CommandRegistration commandRegistration;
+
     @Override
     public void onEnable() {
         // Plugin startup logic
-
+        commandRegistration = new CommandRegistration(this.getLifecycleManager());
+        commandRegistration.registerCommand(this.getLifecycleManager());
     }
 
     @Override
