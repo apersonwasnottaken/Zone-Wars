@@ -35,14 +35,7 @@ public class PluginData {
      *     {"name": "Team 1", "color": 0, "members": [{"username": "Test1", "uuid": "d083b954-a81a-4e3f-8a5a-0629f3c13028"}, {"username": "Test2", "uuid": "281469bf-2016-4296-9470-1a2aa310d899"}]}
      *   ]
      *   "zones": [
-     *     [ // Team 1's Zones
-     *       {"world": "world", "min_x": 0, "max_x": 32, "min_z": 0, "max_z": 32, "health": 1000, "capital": false},
-     *       {"world": "world", "min_x": 512, "max_x": 576, "min_z": 256, "max_z": 320, "health": 5000, "capital": true}
-     *     ],
-     *     [ // Team 2's Zones
-     *       {"world": "world_nether", "min_x": 0, "max_x": -32, "min_z": 0, "max_z": -32, "health": 1000, "capital": false},
-     *       {"world": "world_nether", "min_x": -512, "max_x": -576, "min_z": -256, "max_z": -320, "health": 5000, "capital": true}
-     *     ]
+     *     {"world": "world", "chunk_region_x": 0, "chunk_region_z": 0, "team": 0}
      *   ]
      * }
      */
@@ -69,7 +62,7 @@ public class PluginData {
 
     public JSONObject getTeam(int teamIdx) {
         if (teamIdx >= getTeamsConfig().length() || teamIdx < 0) {
-            return new JSONObject("{\"name\": \"\", \"color\": 0, \"members\": []}");
+            return new JSONObject();
         }
         return getTeamsConfig().getJSONObject(teamIdx);
     }

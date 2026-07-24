@@ -1,0 +1,4 @@
+name: Zone Wars
+version: '1.0-SNAPSHOT'
+main: com.rift.zoneWars.ZoneWars
+api-version: '1.21'
