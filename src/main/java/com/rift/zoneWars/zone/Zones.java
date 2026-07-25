@@ -1,19 +1,18 @@
 package com.rift.zoneWars.zone;
 
 import com.rift.zoneWars.PluginData;
-import com.rift.zoneWars.Teams;
 import com.rift.zoneWars.ZoneWars;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.checkerframework.checker.units.qual.A;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Objects;
-import java.util.UUID;
 
 public class Zones {
     // Zone size: 2x2 chunks
@@ -21,25 +20,20 @@ public class Zones {
     private final ZoneWars plugin;
     private final ComponentLogger logger;
     private final PluginData pluginData;
-    private final Teams teams;
     private int defaultTerritoryAmount = 0;
-    private JSONArray territories;
 
-    public Zones(ZoneWars plugin, PluginData pluginData, Teams teams) {
+    public Zones(ZoneWars plugin, PluginData pluginData) {
         this.pluginData = pluginData;
         this.plugin = plugin;
         this.logger = plugin.getComponentLogger();
-        this.teams = teams;
-        this.territories = pluginData.getTerritoriesConfig();
     }
 
     public int getDefaultTerritoryAmount() {
         return defaultTerritoryAmount;
     }
 
-    public void generateZones(int numTeams, World world) {
-        int borderRadius = (int) world.getWorldBorder().getMaxSize();
-        defaultTerritoryAmount = (int) (Math.pow(borderRadius * 2 / 32, 2) / numTeams);
+    public void generateZones(int borderRadius, int teams, World world) {
+        defaultTerritoryAmount = (int) (Math.pow(borderRadius * 2 / 32, 2) / teams);
         JSONArray zoneData = new JSONArray();
         for (int x = ((-borderRadius / 16 - 1) / 2) * 2; x < borderRadius / 16 + 1; x += 2) {
             for (int z = ((-borderRadius / 16 - 1) / 2) * 2; z < borderRadius / 16; z += 2) {
@@ -51,34 +45,30 @@ public class Zones {
                     zone.put("team", -1);
                 }
                 else {
-                    UUID team1UUID = teams.getTeamUUID(0);
-                    UUID team2UUID = teams.getTeamUUID(1);
-                    UUID team3UUID = teams.getTeamUUID(2);
-                    UUID team4UUID = teams.getTeamUUID(3);
-                    switch (numTeams) {
+                    switch (teams) {
                         case 2:
                             if (x < 0) {
-                                zone.put("team", team1UUID.toString());
+                                zone.put("team", 0);
                             }
                             else {
-                                zone.put("team", team2UUID.toString());
+                                zone.put("team", 1);
                             }
                             break;
                         case 4:
                             if (x < 0) {
                                 if (z < 0) {
-                                    zone.put("team", team1UUID.toString());
+                                    zone.put("team", 0);
                                 }
                                 else {
-                                    zone.put("team", team2UUID.toString());
+                                    zone.put("team", 1);
                                 }
                             }
                             else {
                                 if (z < 0) {
-                                    zone.put("team", team3UUID.toString());
+                                    zone.put("team", 2);
                                 }
                                 else {
-                                    zone.put("team", team4UUID.toString());
+                                    zone.put("team", 3);
                                 }
                             }
                             break;
@@ -93,15 +83,14 @@ public class Zones {
                 zoneData.put(zone);
             }
         }
-        updateTerritories();
     }
 
-    public void updateTerritories() {
-        pluginData.updateData(pluginData.readData().put("territories", territories));
+    public JSONArray getTerritories() {
+        return pluginData.readData().getJSONArray("territories");
     }
 
-    public void getTerritories() {
-        territories = pluginData.getTerritoriesConfig();
+    public void updateTerritories(JSONArray newTerritories) {
+        pluginData.updateData(pluginData.readData().put("territories", newTerritories));
     }
 
     /**
@@ -110,9 +99,8 @@ public class Zones {
      * @return A JSONArray containing a list of a team's territory. If they have none, returns an empty JSONArray
      */
     public JSONArray getTeamTerritories(int teamIdx) {
-        getTerritories();
         JSONArray teamTerritories = new JSONArray();
-        territories.forEach(obj -> {
+        getTerritories().forEach(obj -> {
             if (((JSONObject) obj).getInt("team") == teamIdx) {
                 teamTerritories.put(obj);
             }
@@ -127,7 +115,6 @@ public class Zones {
      * @return A JSONObject with info of the territory the player is in. If multiple territories meet the criteria, it will return the last entry in the list. If the team does not have a capital territory, it returns an empty JSONObject.
      */
     public JSONObject getCapitalTerritory(int teamIdx) {
-        getTerritories();
         final JSONObject[] foundTerritory = {new JSONObject()};
         getTeamTerritories(teamIdx).forEach(obj -> {
             if (((JSONObject) obj).getBoolean("capital")) {
@@ -144,8 +131,8 @@ public class Zones {
      * @return A JSONObject with info of the territory the player is in. If it cannot find a territory, it will return a new JSONObject.
      */
     public JSONObject findTerritoryFromLocation(Location location) {
-        for (int i = 0; i < territories.length(); i++) {
-            JSONObject territory = territories.getJSONObject(i);
+        for (int i = 0; i < getTerritories().length(); i++) {
+            JSONObject territory = getTerritories().getJSONObject(i);
             if (!location.getWorld().getName().equals(territory.getString("world"))) continue;
             if (location.getX() >= territory.getInt("chunk_region_x") * 16 && location.getX() <= territory.getInt("chunk_region_x") * 16 + 31) {
                 if (location.getZ() >= territory.getInt("chunk_region_z") * 16 && location.getZ() <= territory.getInt("chunk_region_z") * 16 + 31) {
@@ -165,14 +152,13 @@ public class Zones {
             logger.warn(MiniMessage.miniMessage().deserialize("Invalid territory data received while trying to update! " + newData));
             return;
         }
-        for (int i = 0; i < territories.length(); i++) {
-            JSONObject territory = territories.getJSONObject(i);
+        for (int i = 0; i < getTerritories().length(); i++) {
+            JSONObject territory = getTerritories().getJSONObject(i);
             // Checks world and position only.
             if (Objects.equals(territory.getString("world"), newData.getString("world"))) {
                 if (Objects.equals(territory.getString("chunk_region_x"), newData.getString("chunk_region_x"))) {
                     if (Objects.equals(territory.getString("chunk_region_z"), newData.getString("chunk_region_z"))) {
-                        territories.put(i, newData);
-                        updateTerritories();
+                        updateTerritories(getTerritories().put(i, newData));
                     }
                 }
             }
@@ -192,12 +178,25 @@ public class Zones {
         });
         return playersInTerritory;
     }
+    public void createCapital(int teamIdx) {
+        JSONArray teamTerritories = getTeamTerritories(teamIdx);
+        Random random = new Random();
 
-    public ArrayList<JSONObject> getAllTerritoryOccupiedByAPlayer() {
-        ArrayList<JSONObject> territories = new ArrayList<>();
-        for (Player player : plugin.getServer().getOnlinePlayers()) {
-            territories.add(findTerritoryFromLocation(player.getLocation()));
+        JSONObject capital = teamTerritories.getJSONObject(
+                random.nextInt(teamTerritories.length()));
+
+        JSONArray territories = getTerritories();
+
+        for (int i = 0; i < territories.length(); i++) {
+            JSONObject territory = territories.getJSONObject(i);
+            if (territory.getString("world").equals(capital.getString("world"))
+                    && territory.getInt("chunk_region_x") == capital.getInt("chunk_region_x")
+                    && territory.getInt("chunk_region_z") == capital.getInt("chunk_region_z")) {
+                territory.put("capital", true);
+                territories.put(i, territory);
+                break;
+            }
         }
-        return territories;
+        updateTerritories(territories);
     }
 }
