@@ -178,4 +178,25 @@ public class Zones {
         });
         return playersInTerritory;
     }
+    public void createCapital(int teamIdx) {
+        JSONArray teamTerritories = getTeamTerritories(teamIdx);
+        Random random = new Random();
+
+        JSONObject capital = teamTerritories.getJSONObject(
+                random.nextInt(teamTerritories.length()));
+
+        JSONArray territories = getTerritories();
+
+        for (int i = 0; i < territories.length(); i++) {
+            JSONObject territory = territories.getJSONObject(i);
+            if (territory.getString("world").equals(capital.getString("world"))
+                    && territory.getInt("chunk_region_x") == capital.getInt("chunk_region_x")
+                    && territory.getInt("chunk_region_z") == capital.getInt("chunk_region_z")) {
+                territory.put("capital", true);
+                territories.put(i, territory);
+                break;
+            }
+        }
+        updateTerritories(territories);
+    }
 }
