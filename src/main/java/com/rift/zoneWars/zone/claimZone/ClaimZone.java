@@ -33,6 +33,9 @@ public class ClaimZone {
         this.zone = zone;
     }
 
+    public JSONObject getZone() {
+        return zone;
+    }
 
     public void startClaimZone(Consumer<EventOutcome> onEndCallback) {
         this.endCallback = onEndCallback;

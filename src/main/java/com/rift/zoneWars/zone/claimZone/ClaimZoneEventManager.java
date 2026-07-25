@@ -21,7 +21,14 @@ public class ClaimZoneEventManager {
         this.zones = zones;
     }
 
-    public void startNewEvent(Teams teams, int invader, int defender, JSONObject zone) {
+    public void startNewClaim(Teams teams, int invader, int defender, JSONObject zone) {
+        for (ClaimZone claimZone : activeEvents.values()) {
+            if (claimZone.getInvader() == invader && claimZone.getDefender() == defender) {
+                if (claimZone.getZone().getInt("chunk_region_x") == zone.getInt("chunk_region_x") && claimZone.getZone().getInt("chunk_region_z") == zone.getInt("chunk_region_z")) {
+                    return; // Such claim already exists and should not be duplicated
+                }
+            }
+        }
         ClaimZone claimZone = new ClaimZone(plugin, teams, invader, defender, zone);
         UUID id = claimZone.getEventId();
         activeEvents.put(id, claimZone);

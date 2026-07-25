@@ -1,6 +1,7 @@
 package com.rift.zoneWars;
 
 import com.rift.zoneWars.zone.Zones;
+import com.rift.zoneWars.zone.claimZone.ClaimZoneEventManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ZoneWars extends JavaPlugin {
@@ -29,22 +30,27 @@ public final class ZoneWars extends JavaPlugin {
      * Teams system
      * Perks and nerfs for varied amounts of territory
      * Capital territories
-     * Claiming territory
      */
 
     private CommandRegistration commandRegistration;
     private PluginData pluginData;
+    private Teams teams;
     private Zones zones;
     private MainGameLoop mainGameLoop;
+    private ClaimZoneEventManager claimZoneEventManager;
 
     @Override
     public void onEnable() {
         // Plugin startup logic
         pluginData = new PluginData(this);
-        zones = new Zones(this, pluginData);
-        commandRegistration = new CommandRegistration(this, this.getLifecycleManager(), zones);
-        commandRegistration.registerCommand(this.getLifecycleManager());
+        teams = new Teams(this, pluginData);
+        zones = new Zones(this, pluginData, teams);
+        claimZoneEventManager = new ClaimZoneEventManager(this, zones);
+        mainGameLoop = new MainGameLoop(this, zones, teams, claimZoneEventManager);
         mainGameLoop.startGameLoop();
+
+        commandRegistration = new CommandRegistration(this, this.getLifecycleManager(), zones, teams, pluginData, claimZoneEventManager);
+        commandRegistration.registerCommand(this.getLifecycleManager());
     }
 
     @Override
