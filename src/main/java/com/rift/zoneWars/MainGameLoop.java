@@ -29,9 +29,9 @@ public class MainGameLoop {
                     player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 20, 0, true));
                     player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 20, 0, true));
                 }
-                // Every 50 pieces of land grants an extra 1/2 a heart
+                // Every 50 pieces of land = 1/2 a heart
                 if (zones.getDefaultTerritoryAmount() > 0) {
-                    Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).setBaseValue(zones.getTeamTerritoryCount(teams.getTeamIndexFromPlayer(player.getUniqueId())));
+                    Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).setBaseValue(20 - Math.max(-20, Math.min(19, (zones.getTeamTerritoryCount(teams.getTeamIndexFromPlayer(player.getUniqueId())) - zones.getDefaultTerritoryAmount()) / 50)));
                 }
             }
         }, 0L, 10L);
