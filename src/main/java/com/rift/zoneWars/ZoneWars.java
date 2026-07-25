@@ -1,5 +1,6 @@
 package com.rift.zoneWars;
 
+import com.rift.zoneWars.zone.Zones;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ZoneWars extends JavaPlugin {
@@ -26,19 +27,24 @@ public final class ZoneWars extends JavaPlugin {
     /*
      * To-do list:
      * Teams system
-     * Automatic territory definition
      * Perks and nerfs for varied amounts of territory
      * Capital territories
      * Claiming territory
      */
 
     private CommandRegistration commandRegistration;
+    private PluginData pluginData;
+    private Zones zones;
+    private MainGameLoop mainGameLoop;
 
     @Override
     public void onEnable() {
         // Plugin startup logic
-        commandRegistration = new CommandRegistration(this.getLifecycleManager());
+        pluginData = new PluginData(this);
+        zones = new Zones(this, pluginData);
+        commandRegistration = new CommandRegistration(this, this.getLifecycleManager(), zones);
         commandRegistration.registerCommand(this.getLifecycleManager());
+        mainGameLoop.startGameLoop();
     }
 
     @Override

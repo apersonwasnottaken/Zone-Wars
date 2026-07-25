@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id("xyz.jpenilla.run-paper") version "2.3.1"
+    id("com.gradleup.shadow") version "9.4.2"
 }
 
 group = 'com.rift'
@@ -17,6 +18,10 @@ repositories {
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
     implementation("org.json:json:20260522")
+}
+
+shadowJar {
+    relocate 'org.json', 'com.rift.zoneWars.libs.json'
 }
 
 tasks {
