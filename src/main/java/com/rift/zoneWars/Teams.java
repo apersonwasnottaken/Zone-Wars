@@ -1,5 +1,6 @@
 package com.rift.zoneWars;
 
+import org.bukkit.entity.Player;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -10,17 +11,65 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class Teams {
     private final ZoneWars plugin;
     private final PluginData pluginData;
+    private JSONArray teamsData;
 
     public Teams(ZoneWars plugin, PluginData pluginData) {
         this.plugin = plugin;
         this.pluginData = pluginData;
+        this.teamsData = pluginData.getTeamsConfig();
+    }
+
+    public void addTeam(String name, int color) {
+        JSONObject newTeam = new JSONObject();
+        newTeam.put("name", name);
+        newTeam.put("color", color);
+        newTeam.put("id", UUID.randomUUID());
+        newTeam.put("members", new JSONArray());
+        teamsData.put(newTeam);
+        updateTeams();
+    }
+
+    public void deleteTeam(UUID teamUUID) {
+        updateTeams();
+        for (int i = 0; i < teamsData.length(); i++) {
+            if (Objects.equals(((JSONObject) teamsData.get(i)).getString("id"), teamUUID.toString())) {
+                teamsData.remove(i);
+                break;
+            }
+        }
+    }
+
+    public void addMemberToTeam(int teamIdx, Player member) {
+        updateTeams();
+    }
+
+    public void removeMemberFromTeam(int teamIdx, Player member) {
+        updateTeams();
     }
 
     public JSONObject getTeam(int teamIdx) {
-        if (teamIdx >= pluginData.getTeamsConfig().length() || teamIdx < 0) {
+        if (teamIdx >= teamsData.length() || teamIdx < 0) {
             return new JSONObject();
         }
-        return pluginData.getTeamsConfig().getJSONObject(teamIdx);
+        return teamsData.getJSONObject(teamIdx);
+    }
+
+    public UUID getTeamUUID(int teamIdx) {
+        return UUID.fromString(getTeam(teamIdx).getString("id"));
+    }
+
+    public int getTeamIndexFromUUID(UUID teamUUID) {
+        for (int i = 0; i < teamsData.length(); i++) {
+            if (UUID.fromString(((JSONObject) teamsData.get(i)).getString("id")) == teamUUID) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    public void updateTeams() {
+        JSONObject newData = pluginData.readData().put("teams", teamsData);
+        pluginData.updateData(newData);
     }
 
     public String getTeamName(int teamIdx) {

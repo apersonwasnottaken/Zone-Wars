@@ -1,6 +1,7 @@
 package com.rift.zoneWars;
 
 import com.rift.zoneWars.ZoneWars;
+import com.rift.zoneWars.zone.Zones;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
@@ -21,15 +22,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 
 public class PluginData {
-    private final ZoneWars plugin;
     private JSONObject data;
     private final JSONObject defaultEntry = new JSONObject("{\"teams\":[],\"territories\":[]}");
     private final Path dataFilePath;
-    private final ComponentLogger logger;
+    private final ZoneWars plugin;
 
     public PluginData(ZoneWars plugin) {
         this.plugin = plugin;
-        this.logger = plugin.getComponentLogger();
         this.dataFilePath = Path.of(plugin.getDataFolder().getAbsolutePath() + "/data.json");
     }
 
@@ -37,7 +36,7 @@ public class PluginData {
      * Plugin data
      * {
      *   "teams": [
-     *     {"name": "Team 1", "color": 0, "members": [{"username": "Test1", "uuid": "d083b954-a81a-4e3f-8a5a-0629f3c13028"}, {"username": "Test2", "uuid": "281469bf-2016-4296-9470-1a2aa310d899"}]}
+     *     {"name": "Team 1", "color": 0, "id": d083b954-a81a-4e3f-8a5a-0629f3c13028, "members": [{"username": "Test1", "uuid": "d083b954-a81a-4e3f-8a5a-0629f3c13028"}, {"username": "Test2", "uuid": "281469bf-2016-4296-9470-1a2aa310d899"}]}
      *   ]
      *   "territories": [
      *     {"world": "world", "chunk_region_x": 0, "chunk_region_z": 0, "team": -1, "capital": false} // Team of -1 means no one claimed it (and no one can claim it)
@@ -52,6 +51,9 @@ public class PluginData {
                 data = new JSONObject(Files.readString(dataFilePath));
             }
             else {
+                if (dataFilePath.getParent() != null) {
+                    Files.createDirectories(dataFilePath.getParent());
+                }
                 Files.createFile(dataFilePath);
                 Files.writeString(dataFilePath, defaultEntry.toString());
                 data = defaultEntry;
@@ -69,5 +71,10 @@ public class PluginData {
     public JSONArray getTeamsConfig() {
         readData();
         return data.getJSONArray("teams");
+    }
+
+    public JSONArray getTerritoriesConfig() {
+        readData();
+        return data.getJSONArray("territories");
     }
 }
