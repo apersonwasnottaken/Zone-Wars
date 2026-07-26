@@ -28,13 +28,24 @@ public class ClaimZoneEventManager {
 
     public void startNewClaim(Teams teams, int invader, int defender, JSONObject zone) {
         if (!plugin.getConfig().getBoolean("claiming_enabled")) return;
+        int zoneChunkX = zone.getInt("chunk_region_x");
+        int zoneChunkZ = zone.getInt("chunk_region_z");
         for (ClaimZone claimZone : activeEvents.values()) {
             if (claimZone.getInvader() == invader && claimZone.getDefender() == defender) {
-                if (claimZone.getZone().getInt("chunk_region_x") == zone.getInt("chunk_region_x") && claimZone.getZone().getInt("chunk_region_z") == zone.getInt("chunk_region_z")) {
+                if (claimZone.getZone().getInt("chunk_region_x") == zoneChunkX && claimZone.getZone().getInt("chunk_region_z") == zoneChunkZ) {
                     return; // Such claim already exists and should not be duplicated
                 }
             }
         }
+        if (
+                    !((!zones.getTerritory(zoneChunkX - 2, zoneChunkZ).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX - 2, zoneChunkZ).getString("team").toString())) == invader) ||
+                    (!zones.getTerritory(zoneChunkX + 2, zoneChunkZ).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX + 2, zoneChunkZ).getString("team").toString())) == invader) ||
+                    (!zones.getTerritory(zoneChunkX, zoneChunkZ - 2).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX, zoneChunkZ - 2).getString("team").toString())) == invader) ||
+                    (!zones.getTerritory(zoneChunkX, zoneChunkZ + 2).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX, zoneChunkZ + 2).getString("team").toString())) == invader))
+        ) {
+            return;
+        }
+
         ClaimZone claimZone = new ClaimZone(plugin, teams, zones, invader, defender, zone);
         UUID id = claimZone.getEventId();
         activeEvents.put(id, claimZone);

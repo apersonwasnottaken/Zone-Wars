@@ -66,6 +66,9 @@ public class Zones {
 
     public void generateZones(int numTeams, World world, Player executor) {
         double borderRadius = world.getWorldBorder().getSize() / 2;
+        if (borderRadius > 10000) {
+            executor.sendMessage(MiniMessage.miniMessage().deserialize("<red>The border size is too big! (" + borderRadius + "). The task has been aborted."));
+        }
         int minCoord = (((int) ((-borderRadius / 16 - 1) / 2)) * 2);
         int maxCoord = (((int) ((borderRadius / 16 + 1) / 2)) * 2);
         int xZones = 0;
