@@ -39,16 +39,16 @@ public class MainGameLoop {
                 Chunk originChunk = world.getChunkAt(player.getLocation());
                 List<List<Integer>> alreadyDrawn = new ArrayList<>();
                 int radius = 4;
-                for (int tx = -radius + originChunk.getX(); tx <= radius + originChunk.getX(); tx++) {
-                    for (int tz = -radius + originChunk.getZ(); tz <= radius + originChunk.getZ(); tz++) {
+                for (int tx = -radius + originChunk.getX(); tx <= radius + originChunk.getX(); tx += 2) {
+                    for (int tz = -radius + originChunk.getZ(); tz <= radius + originChunk.getZ(); tz += 2) {
                         if (alreadyDrawn.contains(List.of(tx, tz))) {
                             continue;
                         }
                         // Spawn particles for chunk
                         double minX = tx * 16 + 0.5;
-                        double maxX = tx * 16 + 15.5;
+                        double maxX = tx * 16 + 31.5;
                         double minZ = tz * 16 + 0.5;
-                        double maxZ = tz * 16 + 15.5;
+                        double maxZ = tz * 16 + 31.5;
                         if (zones.getTerritory(tx, tz).isEmpty() || Objects.equals(zones.getTerritory(tx, tz).get("team").toString(), "-1")) continue;
                         int teamColor = teams.getTeamColor(teams.getTeamIndexFromUUID(
                                 UUID.fromString(

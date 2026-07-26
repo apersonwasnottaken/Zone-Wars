@@ -152,7 +152,7 @@ public class Zones {
     }
 
     public JSONArray getTerritories() {
-        return pluginData.readData().getJSONArray("territories");
+        return territories;
     }
 
     public void updateTerritories() {
@@ -262,8 +262,10 @@ public class Zones {
     public ArrayList<Player> getPlayersInTerritory(int tx, int tz) {
         ArrayList<Player> playersInTerritory = new ArrayList<>();
         plugin.getServer().getOnlinePlayers().forEach(player -> {
-            if (findTerritoryFromLocation(player.getLocation()).getInt("chunk_region_x") == tx && findTerritoryFromLocation(player.getLocation()).getInt("chunk_region_x") == tz) {
-                playersInTerritory.add(player);
+            if (!findTerritoryFromLocation(player.getLocation()).isEmpty()) {
+                if (findTerritoryFromLocation(player.getLocation()).getInt("chunk_region_x") == tx && findTerritoryFromLocation(player.getLocation()).getInt("chunk_region_z") == tz) {
+                    playersInTerritory.add(player);
+                }
             }
         });
         return playersInTerritory;

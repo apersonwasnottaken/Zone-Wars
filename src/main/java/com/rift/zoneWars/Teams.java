@@ -4,20 +4,35 @@ import org.bukkit.entity.Player;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Teams {
     private final ZoneWars plugin;
     private final PluginData pluginData;
     private JSONArray teamsData;
+    private final Map<UUID, Integer> playerTeamCache = new HashMap<>();
 
     public Teams(ZoneWars plugin, PluginData pluginData) {
         this.plugin = plugin;
         this.pluginData = pluginData;
         this.teamsData = pluginData.getTeamsConfig();
+        cacheTeams();
+    }
+
+    public void cacheTeams() {
+        playerTeamCache.clear();
+        for (int i = 0; i < pluginData.getTeamsConfig().length(); i++) {
+            JSONArray teamMembers = getTeamMembers(i);
+            for (int j = 0; j < teamMembers.length(); j++) {
+                JSONObject member = teamMembers.getJSONObject(j);
+                try {
+                    UUID uuid = UUID.fromString(member.getString("uuid"));
+                    playerTeamCache.put(uuid, i);
+                } catch (IllegalArgumentException e) {
+                }
+            }
+        }
     }
 
     public void addTeam(String name, int color) {
@@ -88,6 +103,7 @@ public class Teams {
         JSONObject newData = pluginData.readData().put("teams", teamsData);
         pluginData.updateData(newData);
         plugin.getMainGameLoop().updateTeamCache();
+        cacheTeams();
     }
 
     public String getTeamName(int teamIdx) {
@@ -114,42 +130,12 @@ public class Teams {
 
     /**
      * Finds and returns the index of the team a player's in.
-     *
-     * @param username The player's username
-     * @return The index of the team the player is in. If a player is in multiple teams, it will return the index of the team that is last in the list (so highest index).
-     */
-    public int getTeamIndexFromPlayer(String username) {
-        AtomicInteger foundTeam = new AtomicInteger(-1);
-        for (int i = 0; i < pluginData.getTeamsConfig().length(); i++) {
-            JSONArray teamMembers = getTeamMembers(i);
-            int finalI = i;
-            teamMembers.forEach(obj -> {
-                if (Objects.equals(((JSONObject) obj).getString("username"), username)) {
-                    foundTeam.set(finalI);
-                }
-            });
-        }
-        return foundTeam.get();
-    }
-
-    /**
-     * Finds and returns the index of the team a player's in.
      * Should be used over getTeamIndexFromPlayer(String username) when possible
      *
      * @param uuid The player's UUID
      * @return The index of the team the player is in. If a player is in multiple teams, it will return the index of the team that is last in the list (so highest index).
      */
     public int getTeamIndexFromPlayer(UUID uuid) {
-        AtomicInteger foundTeam = new AtomicInteger(-1);
-        for (int i = 0; i < pluginData.getTeamsConfig().length(); i++) {
-            JSONArray teamMembers = getTeamMembers(i);
-            int finalI = i;
-            teamMembers.forEach(obj -> {
-                if (Objects.equals(UUID.fromString(((JSONObject) obj).get("uuid").toString()), uuid)) {
-                    foundTeam.set(finalI);
-                }
-            });
-        }
-        return foundTeam.get();
+        return playerTeamCache.getOrDefault(uuid, -1);
     }
 }
