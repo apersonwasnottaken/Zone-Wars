@@ -34,12 +34,7 @@ public class MainGameLoop {
             for (Player player : plugin.getServer().getOnlinePlayers()) {
                 // Every (200 / amount of teams) pieces of land = 1/2 a heart
                 if (zones.getDefaultTerritoryAmount() > 0) {
-                    int maxHealth = 20 - Math.max(-20, Math.min(19, (zones.getTeamTerritoryCount(teams.getTeamIndexFromPlayer(player.getUniqueId())) - zones.getDefaultTerritoryAmount()) / (200 / pluginData.getTeamsConfig().length())));
-                    if (!zones.findTerritoryFromLocation(player.getLocation()).isEmpty()) {
-                        if (zones.findTerritoryFromLocation(player.getLocation()).getBoolean(("capital")) && teams.getTeamIndexFromUUID(UUID.fromString(zones.findTerritoryFromLocation(player.getLocation()).get("team").toString())) == teams.getTeamIndexFromPlayer(player.getUniqueId())) {
-                            maxHealth += 16;
-                        }
-                    }
+                    int maxHealth = zones.getMaxHealth(player);
                     Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).setBaseValue(maxHealth);
                 }
                 // Player buffs for capital
@@ -48,6 +43,7 @@ public class MainGameLoop {
                             zones.findTerritoryFromLocation(player.getLocation()).getBoolean(("capital")) &&
                             teams.getTeamIndexFromUUID(UUID.fromString(zones.findTerritoryFromLocation(player.getLocation()).get("team").toString())) == teams.getTeamIndexFromPlayer(player.getUniqueId())
                     ) {
+                        player.addPotionEffect(new PotionEffect(PotionEffectType.HEALTH_BOOST, 20, 3, true));
                         player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 20, 0, true));
                         player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 20, 0, true));
                     }

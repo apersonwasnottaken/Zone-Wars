@@ -32,7 +32,7 @@ public class ClaimZoneEventManager {
                 }
             }
         }
-        ClaimZone claimZone = new ClaimZone(plugin, teams, invader, defender, zone);
+        ClaimZone claimZone = new ClaimZone(plugin, teams, zones, invader, defender, zone);
         UUID id = claimZone.getEventId();
         activeEvents.put(id, claimZone);
         claimZone.startClaimZone((outcome) -> {

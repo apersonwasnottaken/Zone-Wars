@@ -2,12 +2,15 @@ package com.rift.zoneWars.zone.claimZone;
 
 import com.rift.zoneWars.Teams;
 import com.rift.zoneWars.ZoneWars;
+import com.rift.zoneWars.zone.Zones;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.title.Title;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 import org.json.JSONObject;
 
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -19,17 +22,19 @@ public class ClaimZone {
     private final int invader, defender;
     private BukkitTask timer;
     private final Teams teams;
-    private JSONObject zone;
+    private final Zones zones;
+    private final JSONObject zone;
     private Consumer<EventOutcome> endCallback;
     private boolean isEnded = false;
 
-    public ClaimZone(ZoneWars plugin, Teams teams, int invader, int defender, JSONObject zone) {
+    public ClaimZone(ZoneWars plugin, Teams teams, Zones zones, int invader, int defender, JSONObject zone) {
         this.plugin = plugin;
         this.eventID = UUID.randomUUID();
         this.secondsRemaining = 120;
         this.invader = invader;
         this.defender = defender;
         this.teams = teams;
+        this.zones = zones;
         this.zone = zone;
     }
 
@@ -68,6 +73,7 @@ public class ClaimZone {
                     player.sendMessage(MiniMessage.miniMessage().deserialize(String.format("""
 The territory at <yellow>(%d, %d)</yellow> is being raided by another team!
 """, zone.getInt("chunk_region_x") * 16, zone.getInt("chunk_region_z") * 16)));
+                    Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).setBaseValue(zones.getMaxHealth(player) + 2);
                 }
             });
             secondsRemaining--;

@@ -234,6 +234,10 @@ public class Zones {
         return playersInTerritory;
     }
 
+    public int getMaxHealth(Player player) {
+        return 20 - Math.max(-20, Math.min(19, (getTeamTerritoryCount(teams.getTeamIndexFromPlayer(player.getUniqueId())) - getDefaultTerritoryAmount()) / (200 / pluginData.getTeamsConfig().length())));
+    }
+
     // Turns a random piece of a team's territory into a capital
     public boolean createCapital(int teamIdx) {
         if (!getCapitalTerritories(teamIdx).isEmpty()) {
