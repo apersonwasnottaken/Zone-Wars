@@ -54,7 +54,7 @@ public class MainGameLoop {
                                 UUID.fromString(
                                         zones.getTerritory(tx, tz).get("team").toString()
                                 )));
-                        Particle.DustOptions dustOptions = new Particle.DustOptions(Color.fromRGB(teamColor), 4.0f);
+                        Particle.DustOptions dustOptions = new Particle.DustOptions(Color.fromRGB(teamColor), 2.0f);
                         int step = 4;
                         for (double x = minX; x <= maxX; x += step) {
                             world.spawnParticle(Particle.DUST, new Location(world, x, world.getHighestBlockYAt((int) x, (int) minZ, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 2, minZ), 1, 0, 0, 0, 0, dustOptions);
@@ -134,6 +134,7 @@ public class MainGameLoop {
         final Component notInTeam = miniMessage.deserialize("Not in a team!");
         final Component noZones1 = miniMessage.deserialize("Territories have not been generated!");
         final Component noZones2 = miniMessage.deserialize("Please contact a server admin.");
+        final Component teamCapitalsTitle = miniMessage.deserialize("<light_purple>Team Capitals");
         updateTeamCache();
         plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
             for (Player player : plugin.getServer().getOnlinePlayers()) {
@@ -182,7 +183,7 @@ public class MainGameLoop {
                 scoreboardLines.add(blank);
                 scoreboardLines.add(currentZoneTitle);
                 scoreboardLines.add(miniMessage.deserialize("Occupied by: <#" + currentZoneTeamHexColor + ">" + (zones.getTerritory(originChunk.getX(), originChunk.getZ()).isEmpty() ? "No one!" : currentZoneTeamName)));
-                scoreboardLines.add(miniMessage.deserialize("Team Capital: <bold>" + (!zones.getTerritory(originChunk.getX(), originChunk.getZ()).isEmpty() && zones.getTerritory(originChunk.getX(), originChunk.getZ()).getBoolean("capital") ? "<green>Yes</green>" : "<red>No</red>")));
+                scoreboardLines.add(miniMessage.deserialize("Is Team Capital: <bold>" + (!zones.getTerritory(originChunk.getX(), originChunk.getZ()).isEmpty() && zones.getTerritory(originChunk.getX(), originChunk.getZ()).getBoolean("capital") ? "<green>Yes</green>" : "<red>No</red>")));
                 scoreboardLines.add(blank);
                 if (teams.getTeamIndexFromPlayer(player.getUniqueId()) > -1) {
                     scoreboardLines.add(miniMessage.deserialize("<#" + teamHexColor + ">" + teams.getTeamName(teams.getTeamIndexFromPlayer(player.getUniqueId()))));
@@ -193,6 +194,13 @@ public class MainGameLoop {
                     else {
                         scoreboardLines.add(miniMessage.deserialize("Claimed Zones: <aqua>" + zones.getTeamTerritories(teamIdx).length() + "</aqua>/<dark_aqua>" + (zones.getTerritories().length() - 4) + "</dark_aqua> (<dark_green>" + ((float) zones.getTeamTerritories(teamIdx).length() / (zones.getTerritories().length() - 4)) * 100 + "%</dark_green>)"));
                         scoreboardLines.add(miniMessage.deserialize("Capitals: " + (!zones.getCapitalTerritories(teamIdx).isEmpty() ? "<green>" : "<red>") + zones.getCapitalTerritories(teamIdx).length()));
+                        if (zones.getCapitalTerritories(teamIdx).length() > 0) {
+                            scoreboardLines.add(blank);
+                            scoreboardLines.add(teamCapitalsTitle);
+                            for (int i = 0; i < zones.getCapitalTerritories(teamIdx).length(); i++) {
+                                scoreboardLines.add(miniMessage.deserialize("(" + ((JSONObject) zones.getCapitalTerritories(teamIdx).get(i)).getInt("chunk_region_x") * 16 + ", " + ((JSONObject) zones.getCapitalTerritories(teamIdx).get(i)).getInt("chunk_region_z") * 16 + ")"));
+                            }
+                        }
                     }
                     scoreboardLines.add(blank);
                     scoreboardLines.add(teamMembersTitle);

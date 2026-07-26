@@ -143,6 +143,7 @@ public class Zones {
             }
             this.territories = newTerritories;
             updateTerritories();
+            rebuildTerritoryCache();
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 executor.hideBossBar(bossBar);
                 executor.sendMessage(MiniMessage.miniMessage().deserialize("<green>Zones successfully generated!"));
