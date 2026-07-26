@@ -5,6 +5,7 @@ import com.rift.zoneWars.ZoneWars;
 import com.rift.zoneWars.zone.Zones;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.title.Title;
+import org.bukkit.Sound;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
@@ -50,6 +51,20 @@ public class ClaimZone {
             secondsRemaining = 120;
         }
         this.endCallback = onEndCallback;
+        teams.getTeamMembers(defender).forEach(obj -> {
+            Player player = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj).getString("uuid")));
+            if (player != null && player.isOnline()) {
+                if (zone.getBoolean("capital")) {
+                    player.playSound((net.kyori.adventure.sound.Sound) Sound.ENTITY_WITHER_SPAWN);
+                    player.playSound((net.kyori.adventure.sound.Sound) Sound.ENTITY_WITHER_DEATH);
+                    player.playSound((net.kyori.adventure.sound.Sound) Sound.ENTITY_ELDER_GUARDIAN_CURSE);
+                }
+                else {
+                    player.playSound((net.kyori.adventure.sound.Sound) Sound.BLOCK_BELL_USE);
+                    player.playSound((net.kyori.adventure.sound.Sound) Sound.BLOCK_NOTE_BLOCK_PLING);
+                }
+            }
+        });
         this.timer = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
             if (secondsRemaining <= 0) {
                 complete(EventOutcome.SUCCESS);

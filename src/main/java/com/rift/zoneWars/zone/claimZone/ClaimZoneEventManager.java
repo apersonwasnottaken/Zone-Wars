@@ -5,6 +5,8 @@ import com.rift.zoneWars.ZoneWars;
 import com.rift.zoneWars.zone.Zones;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.Sound;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.json.JSONObject;
 
@@ -71,12 +73,31 @@ public class ClaimZoneEventManager {
                 teams.getTeamMembers(invader).forEach(obj -> {
                     Player player = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj).getString("uuid")));
                     if (player != null && player.isOnline()) {
+                        Random random = new Random();
+                        if (zone.getBoolean("capital")) {
+                            player.playSound((net.kyori.adventure.sound.Sound) (random.nextInt(2) == 1 ? Sound.ITEM_GOAT_HORN_SOUND_3 : Sound.ITEM_GOAT_HORN_SOUND_5));
+                            AtomicInteger count = new AtomicInteger();
+                            plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+                                plugin.getServer().getWorld("world").spawnEntity(player.getLocation(), EntityType.FIREWORK_ROCKET);
+                                count.getAndIncrement();
+                            }, 0L, 10L);
+                        }
+                        else {
+                            player.playSound((net.kyori.adventure.sound.Sound) (random.nextInt(2) == 1 ? Sound.ITEM_GOAT_HORN_SOUND_1 : Sound.ITEM_GOAT_HORN_SOUND_6));
+                            player.playSound((net.kyori.adventure.sound.Sound) Sound.ENTITY_PLAYER_LEVELUP);
+                        }
                         player.sendMessage(invaderMessage);
                     }
                 });
                 teams.getTeamMembers(defender).forEach(obj -> {
                     Player player = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj).getString("uuid")));
                     if (player != null && player.isOnline()) {
+                        if (zone.getBoolean("capital")) {
+                            player.playSound((net.kyori.adventure.sound.Sound) Sound.ENTITY_ENDER_DRAGON_DEATH);
+                        }
+                        else {
+                            player.playSound((net.kyori.adventure.sound.Sound) Sound.BLOCK_BEACON_DEACTIVATE);
+                        }
                         player.sendMessage(defenderMessage);
                     }
                 });
