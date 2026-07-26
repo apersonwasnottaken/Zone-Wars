@@ -14,11 +14,13 @@ import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 import io.papermc.paper.plugin.lifecycle.event.LifecycleEventManager;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
@@ -133,15 +135,16 @@ Is team capital? %s
                                         return builder.buildFuture();
                                     })
                                     .executes(ctx -> {
-                                        JSONObject zone = zones.getCapitalTerritory(teams.getTeamIndexFromUUID(ctx.getArgument("team", UUID.class)));
+                                        JSONArray capitalZones = zones.getCapitalTerritories(teams.getTeamIndexFromUUID(ctx.getArgument("team", UUID.class)));
                                         if (!(ctx.getSource().getExecutor() instanceof Player)) {
                                             logger.warn("Command must be executed by a player!");
                                             return 1;
                                         }
-                                        if (zone.isEmpty()) {
+                                        if (capitalZones.isEmpty()) {
                                             ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<red>Capital territory not found for team </red><aqua>" + ctx.getArgument("team", UUID.class) + "</aqua><red>.</red>"));
                                             return 1;
                                         }
+                                        JSONObject zone = capitalZones.getJSONObject(0);
                                         ctx.getSource().getExecutor().teleportAsync(new Location(plugin.getServer().getWorld("world"), zone.getInt("chunk_region_x") * 16, plugin.getServer().getWorld("world").getHighestBlockYAt(zone.getInt("chunk_region_x") * 16, zone.getInt("chunk_region_z") * 16), zone.getInt("chunk_region_z") * 16));
                                         ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Successfully teleported!</green>"));
                                         return Command.SINGLE_SUCCESS;
@@ -263,6 +266,31 @@ Is team capital? %s
                                     )
                             )
                     )
+                    .then(Commands.literal("team_info")
+                            .executes(ctx -> {
+                                if (!(ctx.getSource().getExecutor() instanceof Player)) {
+                                    logger.warn("Command must be executed by a player!");
+                                    return -1;
+                                }
+                                int teamIdx = teams.getTeamIndexFromPlayer(ctx.getSource().getExecutor().getUniqueId());
+                                if (teamIdx < 0) {
+                                    ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<red>You are not in a team!"));
+                                }
+                                Component message = MiniMessage.miniMessage().deserialize(String.format("""
+                                        <bold><#%s>%s</bold><white>
+                                        Claimed Zones: %d/%d (%f%%)
+                                        Capitals: %d
+                                        """,
+                                        Integer.toHexString(teams.getTeamColor(teamIdx)),
+                                        teams.getTeamName(teamIdx),
+                                        zones.getTeamTerritories(teamIdx).length(),
+                                        zones.getTerritories().length() - 4,
+                                        ((float) zones.getTeamTerritories(teamIdx).length() / (zones.getTerritories().length() - 4)) * 100,
+                                        zones.getCapitalTerritories(teamIdx).length()
+                                ));
+                                ctx.getSource().getExecutor().sendMessage(message);
+                                return Command.SINGLE_SUCCESS;
+                            }))
                     .build();
             commands.registrar().register(buildCommand, "Commands for Zone Wars gimmick", List.of("zw", "zwars"));
         });

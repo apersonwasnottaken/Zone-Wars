@@ -166,16 +166,16 @@ public class Zones {
      * Finds and returns the capital territory of a team.
      *
      * @param teamIdx Team index
-     * @return A JSONObject with info of the territory the player is in. If multiple territories meet the criteria, it will return the last entry in the list. If the team does not have a capital territory, it returns an empty JSONObject.
+     * @return A JsONArray with a list of info of the capital territories. If the team does not have a capital territory, it returns an empty JSONArray.
      */
-    public JSONObject getCapitalTerritory(int teamIdx) {
-        final JSONObject[] foundTerritory = {new JSONObject()};
+    public JSONArray getCapitalTerritories(int teamIdx) {
+        JSONArray foundTerritory = new JSONArray();
         getTeamTerritories(teamIdx).forEach(obj -> {
             if (((JSONObject) obj).getBoolean("capital")) {
-                foundTerritory[0] = (JSONObject) obj;
+                foundTerritory.put((JSONObject) obj);
             }
         });
-        return foundTerritory[0];
+        return foundTerritory;
     }
 
     /**
@@ -236,7 +236,7 @@ public class Zones {
 
     // Turns a random piece of a team's territory into a capital
     public boolean createCapital(int teamIdx) {
-        if (!getCapitalTerritory(teamIdx).isEmpty()) {
+        if (!getCapitalTerritories(teamIdx).isEmpty()) {
             return false;
         }
         JSONArray teamTerritories = getTeamTerritories(teamIdx);

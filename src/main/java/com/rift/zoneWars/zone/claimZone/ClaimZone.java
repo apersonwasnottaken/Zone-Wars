@@ -38,6 +38,12 @@ public class ClaimZone {
     }
 
     public void startClaimZone(Consumer<EventOutcome> onEndCallback) {
+        if (zone.getBoolean("capital")) {
+            secondsRemaining = 60 * 15;
+        }
+        else {
+            secondsRemaining = 120;
+        }
         this.endCallback = onEndCallback;
         this.timer = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
             if (secondsRemaining <= 0) {
