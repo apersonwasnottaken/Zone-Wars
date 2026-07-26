@@ -3,20 +3,28 @@ package com.rift.zoneWars;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.rift.zoneWars.zone.Zones;
 import com.rift.zoneWars.zone.claimZone.ClaimZoneEventManager;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 import io.papermc.paper.plugin.lifecycle.event.LifecycleEventManager;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 
 public class CommandRegistration {
 
@@ -43,7 +51,7 @@ public class CommandRegistration {
             LiteralCommandNode<CommandSourceStack> buildCommand = Commands.literal("zonewars")
                     .then(opBranch("get_current_zone")
                             .executes(ctx -> {
-                                if (ctx.getSource().getExecutor() == null) {
+                                if (!(ctx.getSource().getExecutor() instanceof Player)) {
                                     logger.warn("Command must be executed by a player!");
                                     return -1;
                                 }
@@ -52,15 +60,28 @@ public class CommandRegistration {
 <yellow><bold>CURRENT ZONE INFO</bold></yellow>
 Origin chunk: (<light_purple>%d</light_purple>, <light_purple>%d</light_purple>)
 From (<light_purple>%d</light_purple>, <light_purple>%d</light_purple>) to (<light_purple>%d</light_purple>, <light_purple>%d</light_purple>)
-Occupied by team <aqua>%d</aqua>
+Occupied by team <click:copy_to_clipboard:%s><hover:show_text:'<yellow>Click to copy to clipboard!'><aqua>%s</aqua></hover></click>
 Is team capital? %s
-""", zone.getInt("chunk_region_x"), zone.getInt("chunk_region_z"), zone.getInt("chunk_region_x") * 16, zone.getInt("chunk_region_x") * 16 + 31, zone.getInt("chunk_region_z") * 16, zone.getInt("chunk_region_x") * 16 + 31, zone.getInt("team"), zone.getBoolean("capital") ? "<green>Yes</green>" : "<red>No</red>")));
+""",
+                                        zone.getInt("chunk_region_x"),
+                                        zone.getInt("chunk_region_z"),
+                                        zone.getInt("chunk_region_x") * 16,
+                                        zone.getInt("chunk_region_z") * 16,
+                                        zone.getInt("chunk_region_x") * 16 + 31,
+                                        zone.getInt("chunk_region_z") * 16 + 31,
+                                        zone.get("team").toString(),
+                                        zone.get("team").toString(),
+                                        zone.getBoolean("capital") ? "<green>Yes</green>" : "<red>No</red>")));
                                 return Command.SINGLE_SUCCESS;
                             })
                     )
                     .then(opBranch("generate_zones")
                             .executes(ctx -> {
-                                zones.generateZones(pluginData.getTerritoriesConfig().length(), plugin.getServer().getWorld("world"));
+                                if (!(ctx.getSource().getExecutor() instanceof Player)) {
+                                    logger.warn("Command must be executed by a player!");
+                                    return -1;
+                                }
+                                zones.generateZones(pluginData.getTeamsConfig().length(), plugin.getServer().getWorld("world"), (Player) ctx.getSource().getExecutor());
                                 return Command.SINGLE_SUCCESS;
                             }))
                     .then(opBranch("start_territory_claim")
@@ -75,16 +96,172 @@ Is team capital? %s
                                 return Command.SINGLE_SUCCESS;
                             })
                     )
-                    .then(opBranch("set_capital_mode_for_territory")
-                            .then(Commands.argument("value", BoolArgumentType.bool()))
+                    .then(opBranch("create_capital")
+                            .then(Commands.argument("team", ArgumentTypes.uuid())
+                                    .suggests((ctx, builder) -> {
+                                        teams.getAllTeamUUIDs().stream()
+                                                .map(UUID::toString)
+                                                .forEach(builder::suggest);
+                                        return builder.buildFuture();
+                                    })
+                                    .executes(ctx -> {
+                                        ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize(zones.createCapital(teams.getTeamIndexFromUUID(ctx.getArgument("team", UUID.class))) ? "<green>Capital creation successful!</green>" : "<red>Capital creation unsuccessful! This may be because a capital zone already exists for the team.</red>"));
+                                        return Command.SINGLE_SUCCESS;
+                                    })
+                            )
+                    )
+                    .then(opBranch("remove_capital")
+                            .then(Commands.argument("team", ArgumentTypes.uuid())
+                                    .suggests((ctx, builder) -> {
+                                        teams.getAllTeamUUIDs().stream()
+                                                .map(UUID::toString)
+                                                .forEach(builder::suggest);
+                                        return builder.buildFuture();
+                                    })
+                                    .executes(ctx -> {
+                                        ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize(zones.removeCapital(teams.getTeamIndexFromUUID(ctx.getArgument("team", UUID.class))) ? "<green>Capital removal successful!</green>" : "<red>Capital removal unsuccessful! This may be because the team does not have a capital.</red>"));
+                                        return Command.SINGLE_SUCCESS;
+                                    })
+                            )
+                    )
+                    .then(opBranch("teleport_to_capital")
+                            .then(Commands.argument("team", ArgumentTypes.uuid())
+                                    .suggests((ctx, builder) -> {
+                                        teams.getAllTeamUUIDs().stream()
+                                                .map(UUID::toString)
+                                                .forEach(builder::suggest);
+                                        return builder.buildFuture();
+                                    })
+                                    .executes(ctx -> {
+                                        JSONObject zone = zones.getCapitalTerritory(teams.getTeamIndexFromUUID(ctx.getArgument("team", UUID.class)));
+                                        if (!(ctx.getSource().getExecutor() instanceof Player)) {
+                                            logger.warn("Command must be executed by a player!");
+                                            return 1;
+                                        }
+                                        if (zone.isEmpty()) {
+                                            ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<red>Capital territory not found for team </red><aqua>" + ctx.getArgument("team", UUID.class) + "</aqua><red>.</red>"));
+                                            return 1;
+                                        }
+                                        ctx.getSource().getExecutor().teleportAsync(new Location(plugin.getServer().getWorld("world"), zone.getInt("chunk_region_x") * 16, plugin.getServer().getWorld("world").getHighestBlockYAt(zone.getInt("chunk_region_x") * 16, zone.getInt("chunk_region_z") * 16), zone.getInt("chunk_region_z") * 16));
+                                        ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Successfully teleported!</green>"));
+                                        return Command.SINGLE_SUCCESS;
+                                    })
+                            )
+                    )
+                    .then(opBranch("create_team")
+                            .then(Commands.argument("team_name", StringArgumentType.string())
+                                    .then(Commands.argument("team_color", IntegerArgumentType.integer(0, 16777215))
+                                            .executes(ctx -> {
+                                                teams.addTeam(ctx.getArgument("team_name", String.class), ctx.getArgument("team_color", Integer.class));
+                                                ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Team created successfully!"));
+                                                return Command.SINGLE_SUCCESS;
+                                            })
+                                    )
+                            )
+                    )
+                    .then(opBranch("get_team_info")
+                            .then(Commands.argument("team_id", ArgumentTypes.uuid())
+                                    .suggests((ctx, builder) -> {
+                                        teams.getAllTeamUUIDs().stream()
+                                                .map(UUID::toString)
+                                                .forEach(builder::suggest);
+                                        return builder.buildFuture();
+                                    })
+                                    .executes(ctx -> {
+                                        final UUID teamUUID = ctx.getArgument("team_id", UUID.class);
+                                        ArrayList<String> teamMemberNames = new ArrayList<>();
+                                        teams.getTeamMembers(teams.getTeamIndexFromUUID(teamUUID)).forEach(obj -> {
+                                            teamMemberNames.add(((JSONObject) obj).getString("username"));
+                                        });
+                                        String teamColor = "0".repeat(6 - Integer.toHexString(teams.getTeamColor(teams.getTeamIndexFromUUID(teamUUID))).length()) + Integer.toHexString(teams.getTeamColor(teams.getTeamIndexFromUUID(teamUUID)));
+                                        ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize(String.format("""
+                                                <green>TEAM INFO</green>
+                                                Team UUID: <hover:show_text:'<yellow>Click to copy to clipboard!'><click:copy_to_clipboard:%s>%s</click></hover>
+                                                Team Name: %s
+                                                Team Color: <#%s>#%s<gray>
+                                                Team Members: %s
+                                                Amount of Territories: %d
+                                                """, teamUUID, teamUUID, teams.getTeamName(teams.getTeamIndexFromUUID(teamUUID)), teamColor, teamColor, String.join(", ", teamMemberNames), zones.getTeamTerritories(teams.getTeamIndexFromUUID(teamUUID)).length())));
+                                        return Command.SINGLE_SUCCESS;
+                                    })
+                            )
+                    )
+                    .then(opBranch("list_teams")
                             .executes(ctx -> {
-                                if (ctx.getSource().getExecutor() == null) {
-                                    logger.warn("Command must be executed by a player!");
-                                    return -1;
+                                StringBuilder message = new StringBuilder("""
+                                        <yellow>List of Teams</yellow>
+                                        """);
+                                for (Object obj : pluginData.getTeamsConfig()) {
+                                    message.append("<#" + Integer.toHexString(((JSONObject) obj).getInt("color")) + "><hover:show_text:\"<aqua>Click to view team info!\"><click:run_command:/zw get_team_info ").append(((JSONObject) obj).getString("id")).append(">").append(((JSONObject) obj).getString("name")).append("</click>\n");
                                 }
-                                // zones.toggleTerritoryCapital(zones.findTerritoryFromLocation(ctx.getSource().getLocation()));
+                                ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize(message.toString()));
                                 return Command.SINGLE_SUCCESS;
-                            })
+                            }))
+                    .then(opBranch("team")
+                            .then(Commands.argument("team_id", StringArgumentType.string())
+                                    .suggests((ctx, builder) -> {
+                                        teams.getAllTeamUUIDs().stream()
+                                                .map(UUID::toString)
+                                                .forEach(builder::suggest);
+                                        return builder.buildFuture();
+                                    })
+                                    .then(Commands.literal("delete")
+                                            .executes(ctx -> {
+                                                teams.deleteTeam(UUID.fromString(ctx.getArgument("team_id", String.class)));
+                                                return Command.SINGLE_SUCCESS;
+                                            })
+                                    )
+                                    .then(Commands.literal("add_team_member")
+                                            .then(Commands.argument("team_member", ArgumentTypes.player())
+                                                    .executes(ctx -> {
+                                                        var selector = ctx.getArgument("team_member", PlayerSelectorArgumentResolver.class);
+                                                        List<Player> players = selector.resolve(ctx.getSource());
+                                                        if (players.isEmpty()) {
+                                                            return 0;
+                                                        }
+                                                        Player targetPlayer = players.getFirst();
+                                                        UUID teamId = UUID.fromString(ctx.getArgument("team_id", String.class));
+                                                        teams.addMemberToTeam(teams.getTeamIndexFromUUID(teamId), targetPlayer);
+                                                        ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Team member added successfully!"));
+                                                        return Command.SINGLE_SUCCESS;
+                                                    })
+                                            )
+                                    )
+                                    .then(Commands.literal("remove_team_member")
+                                            .then(Commands.argument("team_member", ArgumentTypes.player())
+                                                    .executes(ctx -> {
+                                                        var selector = ctx.getArgument("team_member", PlayerSelectorArgumentResolver.class);
+                                                        List<Player> players = selector.resolve(ctx.getSource());
+                                                        if (players.isEmpty()) {
+                                                            return 0;
+                                                        }
+                                                        Player targetPlayer = players.getFirst();
+                                                        UUID teamId = UUID.fromString(ctx.getArgument("team_id", String.class));
+                                                        teams.removeMemberFromTeam(teams.getTeamIndexFromUUID(teamId), targetPlayer);
+                                                        ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Team member removed successfully!"));
+                                                        return Command.SINGLE_SUCCESS;
+                                                    })
+                                            )
+                                    )
+                                    .then(Commands.literal("change_team_name")
+                                            .then(Commands.argument("team_name", StringArgumentType.string())
+                                                    .executes(ctx -> {
+                                                        teams.setTeamName(teams.getTeamIndexFromUUID(UUID.fromString(ctx.getArgument("team_id", String.class))), ctx.getArgument("team_name", String.class));
+                                                        ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Team name changed!"));
+                                                        return Command.SINGLE_SUCCESS;
+                                                    })
+                                            )
+                                    )
+                                    .then(Commands.literal("change_team_color")
+                                            .then(Commands.argument("team_color", IntegerArgumentType.integer(0, 16777215))
+                                                    .executes(ctx -> {
+                                                        teams.setTeamColor(teams.getTeamIndexFromUUID(UUID.fromString(ctx.getArgument("team_id", String.class))), ctx.getArgument("team_color", Integer.class));
+                                                        ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Team color changed!"));
+                                                        return Command.SINGLE_SUCCESS;
+                                                    })
+                                            )
+                                    )
+                            )
                     )
                     .build();
             commands.registrar().register(buildCommand, "Commands for Zone Wars gimmick", List.of("zw", "zwars"));

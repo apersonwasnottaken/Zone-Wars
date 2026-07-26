@@ -4,6 +4,7 @@ import org.bukkit.entity.Player;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -32,7 +33,7 @@ public class Teams {
     public void deleteTeam(UUID teamUUID) {
         updateTeams();
         for (int i = 0; i < teamsData.length(); i++) {
-            if (Objects.equals(((JSONObject) teamsData.get(i)).getString("id"), teamUUID.toString())) {
+            if (Objects.equals(((JSONObject) teamsData.get(i)).get("id").toString(), teamUUID.toString())) {
                 teamsData.remove(i);
                 break;
             }
@@ -40,31 +41,47 @@ public class Teams {
     }
 
     public void addMemberToTeam(int teamIdx, Player member) {
+        for (int i = 0; i < ((JSONObject) teamsData.get(teamIdx)).getJSONArray("members").length(); i++) {
+            if (Objects.equals(((JSONObject) ((JSONObject) teamsData.get(teamIdx)).getJSONArray("members").get(i)).get("uuid").toString(), member.getUniqueId().toString())) {
+                return;
+            }
+        }
+        ((JSONObject) teamsData.get(teamIdx)).getJSONArray("members").put(new JSONObject().put("username", member.getName()).put("uuid", member.getUniqueId()));
         updateTeams();
     }
 
     public void removeMemberFromTeam(int teamIdx, Player member) {
+        for (int i = 0; i < ((JSONObject) teamsData.get(teamIdx)).getJSONArray("members").length(); i++) {
+            if (Objects.equals(((JSONObject) ((JSONObject) teamsData.get(teamIdx)).getJSONArray("members").get(i)).get("uuid").toString(), member.getUniqueId().toString())) {
+                ((JSONObject) teamsData.get(teamIdx)).getJSONArray("members").remove(i);
+            }
+        }
         updateTeams();
     }
 
     public JSONObject getTeam(int teamIdx) {
-        if (teamIdx >= teamsData.length() || teamIdx < 0) {
-            return new JSONObject();
-        }
         return teamsData.getJSONObject(teamIdx);
     }
 
     public UUID getTeamUUID(int teamIdx) {
-        return UUID.fromString(getTeam(teamIdx).getString("id"));
+        return UUID.fromString(getTeam(teamIdx).get("id").toString());
     }
 
     public int getTeamIndexFromUUID(UUID teamUUID) {
         for (int i = 0; i < teamsData.length(); i++) {
-            if (UUID.fromString(((JSONObject) teamsData.get(i)).getString("id")) == teamUUID) {
+            if (Objects.equals(((JSONObject) teamsData.get(i)).get("id").toString(), teamUUID.toString())) {
                 return i;
             }
         }
         return -1;
+    }
+
+    public ArrayList<UUID> getAllTeamUUIDs() {
+        ArrayList<UUID> uuids = new ArrayList<>();
+        teamsData.forEach(obj -> {
+            uuids.add(UUID.fromString(((JSONObject) obj).get("id").toString()));
+        });
+        return uuids;
     }
 
     public void updateTeams() {
@@ -76,8 +93,18 @@ public class Teams {
         return getTeam(teamIdx).getString("name");
     }
 
+    public void setTeamName(int teamIdx, String name) {
+        teamsData.put(teamIdx, getTeam(teamIdx).put("name", name));
+        updateTeams();
+    }
+
     public int getTeamColor(int teamIdx) {
         return getTeam(teamIdx).getInt("color");
+    }
+
+    public void setTeamColor(int teamIdx, int color) {
+        teamsData.put(teamIdx, getTeam(teamIdx).put("color", color));
+        updateTeams();
     }
 
     public JSONArray getTeamMembers(int teamIdx) {
@@ -117,7 +144,7 @@ public class Teams {
             JSONArray teamMembers = getTeamMembers(i);
             int finalI = i;
             teamMembers.forEach(obj -> {
-                if (Objects.equals(UUID.fromString(((JSONObject) obj).getString("uuid")), uuid)) {
+                if (Objects.equals(UUID.fromString(((JSONObject) obj).get("uuid").toString()), uuid)) {
                     foundTeam.set(finalI);
                 }
             });

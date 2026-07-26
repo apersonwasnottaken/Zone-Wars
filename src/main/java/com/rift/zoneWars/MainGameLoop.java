@@ -16,12 +16,14 @@ import java.util.UUID;
 public class MainGameLoop {
 
     private final ZoneWars plugin;
+    private final PluginData pluginData;
     private final Zones zones;
     private final Teams teams;
     private final ClaimZoneEventManager claimZoneEventManager;
 
-    public MainGameLoop(ZoneWars plugin, Zones zones, Teams teams, ClaimZoneEventManager claimZoneEventManager) {
+    public MainGameLoop(ZoneWars plugin, PluginData pluginData, Zones zones, Teams teams, ClaimZoneEventManager claimZoneEventManager) {
         this.plugin = plugin;
+        this.pluginData = pluginData;
         this.zones = zones;
         this.teams = teams;
         this.claimZoneEventManager = claimZoneEventManager;
@@ -30,17 +32,25 @@ public class MainGameLoop {
     public void startGameLoop() {
         plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
             for (Player player : plugin.getServer().getOnlinePlayers()) {
+                // Every (200 / amount of teams) pieces of land = 1/2 a heart
+                if (zones.getDefaultTerritoryAmount() > 0) {
+                    int maxHealth = 20 - Math.max(-20, Math.min(19, (zones.getTeamTerritoryCount(teams.getTeamIndexFromPlayer(player.getUniqueId())) - zones.getDefaultTerritoryAmount()) / (200 / pluginData.getTeamsConfig().length())));
+                    if (!zones.findTerritoryFromLocation(player.getLocation()).isEmpty()) {
+                        if (zones.findTerritoryFromLocation(player.getLocation()).getBoolean(("capital")) && teams.getTeamIndexFromUUID(UUID.fromString(zones.findTerritoryFromLocation(player.getLocation()).get("team").toString())) == teams.getTeamIndexFromPlayer(player.getUniqueId())) {
+                            maxHealth += 16;
+                        }
+                    }
+                    Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).setBaseValue(maxHealth);
+                }
                 // Player buffs for capital
                 if (!zones.findTerritoryFromLocation(player.getLocation()).isEmpty()) {
-                    if (zones.findTerritoryFromLocation(player.getLocation()).getBoolean(("capital")) && zones.findTerritoryFromLocation(player.getLocation()).getInt("team") == teams.getTeamIndexFromPlayer(player.getUniqueId())) {
-                        player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 20, 3, true));
+                    if (
+                            zones.findTerritoryFromLocation(player.getLocation()).getBoolean(("capital")) &&
+                            teams.getTeamIndexFromUUID(UUID.fromString(zones.findTerritoryFromLocation(player.getLocation()).get("team").toString())) == teams.getTeamIndexFromPlayer(player.getUniqueId())
+                    ) {
                         player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 20, 0, true));
                         player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 20, 0, true));
                     }
-                }
-                // Every 50 pieces of land = 1/2 a heart
-                if (zones.getDefaultTerritoryAmount() > 0) {
-                    Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).setBaseValue(20 - Math.max(-20, Math.min(19, (zones.getTeamTerritoryCount(teams.getTeamIndexFromPlayer(player.getUniqueId())) - zones.getDefaultTerritoryAmount()) / 50)));
                 }
             }
             // To-do: Claiming territory
@@ -55,7 +65,16 @@ public class MainGameLoop {
                         teamInTerritory.put(teams.getTeamUUID(teams.getTeamIndexFromPlayer(player.getUniqueId())), 1);
                     }
                 }
-                int defendingPlayers = teamInTerritory.get(teams.getTeamUUID(territory.getInt("team")));
+                if (Objects.equals(territory.get("team").toString(), "-1")) {
+                    continue;
+                }
+                if (teams.getTeamIndexFromUUID(UUID.fromString(territory.get("team").toString())) < 0) {
+                    continue;
+                }
+                if (teamInTerritory.get(UUID.fromString(territory.get("team").toString())) == null) {
+                    continue;
+                }
+                int defendingPlayers = teamInTerritory.get(UUID.fromString(territory.get("team").toString()));
                 for (Map.Entry<UUID, Integer> team : teamInTerritory.entrySet()) {
                     if (team.getValue() - 2 >= defendingPlayers) {
                         // Start a claim
