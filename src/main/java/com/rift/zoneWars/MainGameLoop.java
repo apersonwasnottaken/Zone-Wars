@@ -8,10 +8,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.json.JSONObject;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 public class MainGameLoop {
 
@@ -71,8 +68,18 @@ public class MainGameLoop {
                     continue;
                 }
                 int defendingPlayers = teamInTerritory.get(UUID.fromString(territory.get("team").toString()));
+                Object teamObj = territory.get("team");
+                if (teamObj == null || Objects.equals(teamObj.toString(), "-1")) return;
+                int teamIndex = teams.getTeamIndexFromUUID(UUID.fromString(teamObj.toString()));
+                if (teamIndex == -1) return;
+                List<?> members = teams.getTeamMembers(teamIndex).toList();
+                long onlineDefendingTeamMembers = members.stream()
+                        .map(obj -> ((JSONObject) obj).getString("uuid"))
+                        .map(uuidStr -> plugin.getServer().getPlayer(UUID.fromString(uuidStr)))
+                        .filter(player -> player != null && player.isOnline())
+                        .count();
                 for (Map.Entry<UUID, Integer> team : teamInTerritory.entrySet()) {
-                    if (team.getValue() - 2 >= defendingPlayers) {
+                    if (team.getValue() - 2 >= defendingPlayers && onlineDefendingTeamMembers > 0) {
                         // Start a claim
                         claimZoneEventManager.startNewClaim(teams, teams.getTeamIndexFromUUID(team.getKey()), territory.getInt("team"), territory);
                         break;
