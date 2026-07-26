@@ -4,7 +4,6 @@ import com.rift.zoneWars.PluginData;
 import com.rift.zoneWars.Teams;
 import com.rift.zoneWars.ZoneWars;
 import net.kyori.adventure.bossbar.BossBar;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
@@ -13,10 +12,9 @@ import org.bukkit.entity.Player;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.Objects;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
 public class Zones {
@@ -28,6 +26,8 @@ public class Zones {
     private int defaultTerritoryAmount = 0;
     private JSONArray territories;
     private final Teams teams;
+    private final Map<String, JSONObject> territoryCache = new ConcurrentHashMap<>();
+
 
     public Zones(ZoneWars plugin, PluginData pluginData, Teams teams) {
         this.pluginData = pluginData;
@@ -35,6 +35,7 @@ public class Zones {
         this.logger = plugin.getComponentLogger();
         this.teams = teams;
         this.territories = pluginData.getTerritoriesConfig();
+        rebuildTerritoryCache();
         updateDefaultTerritoryAmount();
     }
 
@@ -162,6 +163,28 @@ public class Zones {
         return teamTerritories;
     }
 
+    public void rebuildTerritoryCache() {
+        territoryCache.clear();
+        for (Object obj : territories) {
+            JSONObject territory = (JSONObject) obj;
+            int rx = territory.getInt("chunk_region_x");
+            int rz = territory.getInt("chunk_region_z");
+
+            for (int xOffset = 0; xOffset <= 1; xOffset++) {
+                for (int zOffset = 0; zOffset <= 1; zOffset++) {
+                    String key = (rx + xOffset) + "," + (rz + zOffset);
+                    territoryCache.put(key, territory);
+                }
+            }
+        }
+    }
+
+    public JSONObject getTerritory(int tx, int tz) {
+        String key = tx + "," + tz;
+        JSONObject territory = territoryCache.get(key);
+        return territory != null ? territory : new JSONObject();
+    }
+
     /**
      * Finds and returns the capital territory of a team.
      *
@@ -172,7 +195,7 @@ public class Zones {
         JSONArray foundTerritory = new JSONArray();
         getTeamTerritories(teamIdx).forEach(obj -> {
             if (((JSONObject) obj).getBoolean("capital")) {
-                foundTerritory.put((JSONObject) obj);
+                foundTerritory.put(obj);
             }
         });
         return foundTerritory;
@@ -218,6 +241,7 @@ public class Zones {
                 }
             }
         }
+        rebuildTerritoryCache();
     }
 
     public int getTeamTerritoryCount(int teamIdx) {
@@ -257,6 +281,7 @@ public class Zones {
                 territory.put("capital", true);
                 territories.put(i, territory);
                 updateTerritories();
+                rebuildTerritoryCache();
                 return true;
             }
         }
@@ -271,6 +296,7 @@ public class Zones {
                 territory.put("capital", false);
                 territories.put(i, territory);
                 updateTerritories();
+                rebuildTerritoryCache();
                 return true;
             }
         }

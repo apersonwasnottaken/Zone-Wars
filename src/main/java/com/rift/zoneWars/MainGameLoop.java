@@ -1,7 +1,9 @@
 package com.rift.zoneWars;
 
+import com.destroystokyo.paper.ParticleBuilder;
 import com.rift.zoneWars.zone.Zones;
 import com.rift.zoneWars.zone.claimZone.ClaimZoneEventManager;
+import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -29,6 +31,39 @@ public class MainGameLoop {
     public void startGameLoop() {
         plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
             for (Player player : plugin.getServer().getOnlinePlayers()) {
+                // Spawn particles in a 2 radius chunk area
+                World world = plugin.getServer().getWorld("world");
+                Chunk originChunk = world.getChunkAt(player.getLocation());
+                List<List<Integer>> alreadyDrawn = new ArrayList<>();
+                int radius = 4;
+                for (int tx = -radius + originChunk.getX(); tx <= radius + originChunk.getX(); tx++) {
+                    for (int tz = -radius + originChunk.getZ(); tz <= radius + originChunk.getZ(); tz++) {
+                        if (alreadyDrawn.contains(List.of(tx, tz))) {
+                            continue;
+                        }
+                        // Spawn particles for chunk
+                        double minX = tx * 16 + 0.5;
+                        double maxX = tx * 16 + 15.5;
+                        double minZ = tz * 16 + 0.5;
+                        double maxZ = tz * 16 + 15.5;
+                        if (zones.getTerritory(tx, tz).isEmpty() || Objects.equals(zones.getTerritory(tx, tz).get("team").toString(), "-1")) continue;
+                        int teamColor = teams.getTeamColor(teams.getTeamIndexFromUUID(
+                                UUID.fromString(
+                                        zones.getTerritory(tx, tz).get("team").toString()
+                                )));
+                        Particle.DustOptions dustOptions = new Particle.DustOptions(Color.fromRGB(teamColor), 4.0f);
+                        int step = 4;
+                        for (double x = minX; x <= maxX; x += step) {
+                            world.spawnParticle(Particle.DUST, new Location(world, x, world.getHighestBlockYAt((int) x, (int) minZ, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 2, minZ), 1, 0, 0, 0, 0, dustOptions);
+                            world.spawnParticle(Particle.DUST, new Location(world, x, world.getHighestBlockYAt((int) x, (int) maxZ, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 2, maxZ), 1, 0, 0, 0, 0, dustOptions);
+                        }
+                        for (double z = minZ; z <= maxZ; z += step) {
+                            world.spawnParticle(Particle.DUST, new Location(world, minX, world.getHighestBlockYAt((int) minX, (int) z, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 2, z), 1, 0, 0, 0, 0, dustOptions);
+                            world.spawnParticle(Particle.DUST, new Location(world, maxX, world.getHighestBlockYAt((int) maxX, (int) z, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 2, z), 1, 0, 0, 0, 0, dustOptions);
+                        }
+                        alreadyDrawn.add(List.of(tx, tz));
+                    }
+                }
                 // Every (200 / amount of teams) pieces of land = 1/2 a heart
                 if (zones.getDefaultTerritoryAmount() > 0) {
                     int maxHealth = zones.getMaxHealth(player);
@@ -46,7 +81,7 @@ public class MainGameLoop {
                     }
                 }
             }
-            // To-do: Claiming territory
+            // Claiming territory (Needs Testing)
             for (JSONObject territory : zones.getAllTerritoryOccupiedByAPlayer()) {
                 if (territory.isEmpty()) continue;
                 Map<UUID, Integer> teamInTerritory = new HashMap<>();
@@ -74,7 +109,7 @@ public class MainGameLoop {
                 if (teamIndex == -1) return;
                 List<?> members = teams.getTeamMembers(teamIndex).toList();
                 long onlineDefendingTeamMembers = members.stream()
-                        .map(obj -> ((JSONObject) obj).getString("uuid"))
+                        .map(obj -> ((java.util.Map<?, ?>) obj).get("uuid").toString())
                         .map(uuidStr -> plugin.getServer().getPlayer(UUID.fromString(uuidStr)))
                         .filter(player -> player != null && player.isOnline())
                         .count();
