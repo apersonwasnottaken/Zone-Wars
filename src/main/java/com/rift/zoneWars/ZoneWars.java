@@ -53,6 +53,10 @@ public final class ZoneWars extends JavaPlugin {
         commandRegistration.registerCommand(this.getLifecycleManager());
     }
 
+    public MainGameLoop getMainGameLoop() {
+        return this.mainGameLoop;
+    }
+
     @Override
     public void onDisable() {
         // Plugin shutdown logic

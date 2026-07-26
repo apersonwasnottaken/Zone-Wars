@@ -87,6 +87,7 @@ public class Teams {
     public void updateTeams() {
         JSONObject newData = pluginData.readData().put("teams", teamsData);
         pluginData.updateData(newData);
+        plugin.getMainGameLoop().updateTeamCache();
     }
 
     public String getTeamName(int teamIdx) {

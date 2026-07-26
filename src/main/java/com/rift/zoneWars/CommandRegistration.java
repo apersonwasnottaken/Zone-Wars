@@ -15,6 +15,7 @@ import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSele
 import io.papermc.paper.plugin.lifecycle.event.LifecycleEventManager;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
@@ -153,9 +154,9 @@ Is team capital? %s
                     )
                     .then(opBranch("create_team")
                             .then(Commands.argument("team_name", StringArgumentType.string())
-                                    .then(Commands.argument("team_color", IntegerArgumentType.integer(0, 16777215))
+                                    .then(Commands.argument("team_color", ArgumentTypes.hexColor())
                                             .executes(ctx -> {
-                                                teams.addTeam(ctx.getArgument("team_name", String.class), ctx.getArgument("team_color", Integer.class));
+                                                teams.addTeam(ctx.getArgument("team_name", String.class), ctx.getArgument("team_color", TextColor.class).value());
                                                 ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Team created successfully!"));
                                                 return Command.SINGLE_SUCCESS;
                                             })
@@ -184,7 +185,7 @@ Is team capital? %s
                                                 Team Color: <#%s>#%s<gray>
                                                 Team Members: %s
                                                 Amount of Territories: %d
-                                                """, teamUUID, teamUUID, teams.getTeamName(teams.getTeamIndexFromUUID(teamUUID)), teamColor, teamColor, String.join(", ", teamMemberNames), zones.getTeamTerritories(teams.getTeamIndexFromUUID(teamUUID)).length())));
+                                                """, teamUUID, teamUUID, teams.getTeamName(teams.getTeamIndexFromUUID(teamUUID)), teamColor, teamColor, teamMemberNames.isEmpty() ? "<italic>None!</italic>" : String.join(", ", teamMemberNames), zones.getTeamTerritories(teams.getTeamIndexFromUUID(teamUUID)).length())));
                                         return Command.SINGLE_SUCCESS;
                                     })
                             )
@@ -256,9 +257,9 @@ Is team capital? %s
                                             )
                                     )
                                     .then(Commands.literal("change_team_color")
-                                            .then(Commands.argument("team_color", IntegerArgumentType.integer(0, 16777215))
+                                            .then(Commands.argument("team_color", ArgumentTypes.hexColor())
                                                     .executes(ctx -> {
-                                                        teams.setTeamColor(teams.getTeamIndexFromUUID(UUID.fromString(ctx.getArgument("team_id", String.class))), ctx.getArgument("team_color", Integer.class));
+                                                        teams.setTeamColor(teams.getTeamIndexFromUUID(UUID.fromString(ctx.getArgument("team_id", String.class))), ctx.getArgument("team_color", TextColor.class).value());
                                                         ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Team color changed!"));
                                                         return Command.SINGLE_SUCCESS;
                                                     })
@@ -266,29 +267,9 @@ Is team capital? %s
                                     )
                             )
                     )
-                    .then(Commands.literal("team_info")
+                    .then(opBranch("toggle_claiming")
                             .executes(ctx -> {
-                                if (!(ctx.getSource().getExecutor() instanceof Player)) {
-                                    logger.warn("Command must be executed by a player!");
-                                    return -1;
-                                }
-                                int teamIdx = teams.getTeamIndexFromPlayer(ctx.getSource().getExecutor().getUniqueId());
-                                if (teamIdx < 0) {
-                                    ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<red>You are not in a team!"));
-                                }
-                                Component message = MiniMessage.miniMessage().deserialize(String.format("""
-                                        <bold><#%s>%s</bold><white>
-                                        Claimed Zones: %d/%d (%f%%)
-                                        Capitals: %d
-                                        """,
-                                        Integer.toHexString(teams.getTeamColor(teamIdx)),
-                                        teams.getTeamName(teamIdx),
-                                        zones.getTeamTerritories(teamIdx).length(),
-                                        zones.getTerritories().length() - 4,
-                                        ((float) zones.getTeamTerritories(teamIdx).length() / (zones.getTerritories().length() - 4)) * 100,
-                                        zones.getCapitalTerritories(teamIdx).length()
-                                ));
-                                ctx.getSource().getExecutor().sendMessage(message);
+                                plugin.getConfig().set("claiming_enabled", !plugin.getConfig().getBoolean("claiming_enabled"));
                                 return Command.SINGLE_SUCCESS;
                             }))
                     .build();

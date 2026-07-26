@@ -27,6 +27,7 @@ public class ClaimZoneEventManager {
     }
 
     public void startNewClaim(Teams teams, int invader, int defender, JSONObject zone) {
+        if (!plugin.getConfig().getBoolean("claiming_enabled")) return;
         for (ClaimZone claimZone : activeEvents.values()) {
             if (claimZone.getInvader() == invader && claimZone.getDefender() == defender) {
                 if (claimZone.getZone().getInt("chunk_region_x") == zone.getInt("chunk_region_x") && claimZone.getZone().getInt("chunk_region_z") == zone.getInt("chunk_region_z")) {

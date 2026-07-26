@@ -67,6 +67,12 @@ public class ClaimZone {
         });
         this.timer = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
             if (secondsRemaining <= 0) {
+                teams.getTeamMembers(defender).forEach(obj -> {
+                    Player player = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj).getString("uuid")));
+                    if (player != null && player.isOnline()) {
+                        player.setGlowing(false);
+                    }
+                });
                 complete(EventOutcome.SUCCESS);
                 return;
             }
@@ -77,7 +83,6 @@ public class ClaimZone {
                     player.sendActionBar(net.kyori.adventure.text.Component.text(
                             "You must hold the territory for " + secondsRemaining + " more seconds!"
                     ));
-                    player.setGlowing(true);
                 }
             });
 
@@ -89,6 +94,7 @@ public class ClaimZone {
 The territory at <yellow>(%d, %d)</yellow> is being raided by another team!
 """, zone.getInt("chunk_region_x") * 16, zone.getInt("chunk_region_z") * 16)));
                     Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).setBaseValue(zones.getMaxHealth(player) + 2);
+                    player.setGlowing(true);
                 }
             });
             secondsRemaining--;

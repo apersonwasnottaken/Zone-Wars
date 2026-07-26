@@ -41,8 +41,8 @@ public class Zones {
 
     public void updateDefaultTerritoryAmount() {
         int borderRadius = (int) (plugin.getServer().getWorld("world").getWorldBorder().getSize() / 2);
-        int minCoord = (((int) ((-borderRadius / 16 - 1) / 2)) * 2);
-        int maxCoord = (((int) ((borderRadius / 16 + 1) / 2)) * 2);
+        int minCoord = ((((-borderRadius / 16 - 1) / 2)) * 2);
+        int maxCoord = ((((borderRadius / 16 + 1) / 2)) * 2);
         int xZones = 0;
         for (int x = minCoord; x < maxCoord; x += 2) {
             xZones++;
@@ -52,7 +52,12 @@ public class Zones {
             zZones++;
         }
         int totalZonesGenerated = xZones * zZones;
-        defaultTerritoryAmount = totalZonesGenerated / pluginData.getTeamsConfig().length();
+        if (pluginData.getTeamsConfig().length() == 0) {
+            defaultTerritoryAmount = 0;
+        }
+        else {
+            defaultTerritoryAmount = totalZonesGenerated / pluginData.getTeamsConfig().length();
+        }
     }
 
     public int getDefaultTerritoryAmount() {
@@ -73,7 +78,9 @@ public class Zones {
         }
         int totalZonesGenerated = xZones * zZones;
         defaultTerritoryAmount = totalZonesGenerated / numTeams;
-        int iterations = (int) IntStream.iterate(minCoord, x -> x < maxCoord, x -> x + 2).flatMap(x -> IntStream.iterate(minCoord, z -> z < maxCoord, z -> z + 2)).count();
+        long xSteps = Math.max(0, (long) Math.ceil((double)(maxCoord - minCoord) / 2));
+        long zSteps = Math.max(0, (long) Math.ceil((double)(maxCoord - minCoord) / 2));
+        int iterations = (int) (xSteps * zSteps);
         BossBar bossBar = BossBar.bossBar(
                 MiniMessage.miniMessage().deserialize("<green>Generating Zones"),
                 0.0f,
@@ -125,7 +132,7 @@ public class Zones {
                     zone.put("capital", false);
                     newTerritories.put(zone);
                     i++;
-                    final float progress = Math.min(1.0f, (float) i / iterations);
+                    final float progress = Math.max(0, Math.min(1.0f, (float) i / iterations));
                     plugin.getServer().getScheduler().runTask(plugin, () -> {
                         bossBar.progress(progress);
                     });

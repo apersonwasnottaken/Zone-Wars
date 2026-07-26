@@ -1,13 +1,16 @@
 package com.rift.zoneWars;
 
-import com.destroystokyo.paper.ParticleBuilder;
 import com.rift.zoneWars.zone.Zones;
 import com.rift.zoneWars.zone.claimZone.ClaimZoneEventManager;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scoreboard.*;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.*;
@@ -123,6 +126,115 @@ public class MainGameLoop {
             }
 
         }, 0L, 10L);
+        MiniMessage miniMessage = MiniMessage.miniMessage();
+        final Component title = miniMessage.deserialize("<bold><italic:false><yellow>ZONE WARS</yellow>");
+        final Component blank = miniMessage.deserialize("");
+        final Component currentZoneTitle = miniMessage.deserialize("<gold>Current Zone</gold>");
+        final Component teamMembersTitle = miniMessage.deserialize("<aqua>Team Members</aqua>");
+        final Component notInTeam = miniMessage.deserialize("Not in a team!");
+        final Component noZones1 = miniMessage.deserialize("Territories have not been generated!");
+        final Component noZones2 = miniMessage.deserialize("Please contact a server admin.");
+        updateTeamCache();
+        plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+            for (Player player : plugin.getServer().getOnlinePlayers()) {
+                World world = plugin.getServer().getWorld("world");
+                Chunk originChunk = world.getChunkAt(player.getLocation());
+                // Scoreboard
+                Scoreboard scoreboard = player.getScoreboard();
+                Objective objective = scoreboard.getObjective("zwscoreboard");
+
+                if (objective == null) {
+                    ScoreboardManager manager = Bukkit.getScoreboardManager();
+                    scoreboard = manager.getNewScoreboard();
+                    objective = scoreboard.registerNewObjective("zwscoreboard", Criteria.DUMMY, Component.text("ZONE WARS"));
+                    objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+
+                    for (int i = 0; i < 31; i++) {
+                        String entryKey = "§" + Integer.toHexString(i) + "§r";
+                        Team team = scoreboard.registerNewTeam("line_" + i);
+                        team.addEntry(entryKey);
+                    }
+                    player.setScoreboard(scoreboard);
+                }
+                objective.displayName(title);
+
+                String currentZoneTeamHexColor;
+                String currentZoneTeamName;
+                if (zones.getTerritory(originChunk.getX(), originChunk.getZ()).isEmpty() || Objects.equals(zones.getTerritory(originChunk.getX(), originChunk.getZ()).get("team").toString(), "-1")) {
+                    currentZoneTeamHexColor = "ffffff";
+                    currentZoneTeamName = "No one!";
+                }
+                else {
+                    currentZoneTeamHexColor = Integer.toHexString(teams.getTeamColor(teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(originChunk.getX(), originChunk.getZ()).get("team").toString()))));
+                    currentZoneTeamHexColor = "0".repeat(6 - currentZoneTeamHexColor.length()) + currentZoneTeamHexColor;
+                    currentZoneTeamName = teams.getTeamName(teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(originChunk.getX(), originChunk.getZ()).get("team").toString())));
+                }
+                int teamIdx = teams.getTeamIndexFromPlayer(player.getUniqueId());
+                String teamHexColor;
+                if (teams.getTeamIndexFromPlayer(player.getUniqueId()) < 0) {
+                    teamHexColor = "ffffff";
+                }
+                else {
+                    teamHexColor = Integer.toHexString(teams.getTeamColor(teamIdx));
+                    teamHexColor = "0".repeat(6 - teamHexColor.length()) + teamHexColor;
+                }
+                ArrayList<Component> scoreboardLines = new ArrayList<>();
+                scoreboardLines.add(blank);
+                scoreboardLines.add(currentZoneTitle);
+                scoreboardLines.add(miniMessage.deserialize("Occupied by: <#" + currentZoneTeamHexColor + ">" + (zones.getTerritory(originChunk.getX(), originChunk.getZ()).isEmpty() ? "No one!" : currentZoneTeamName)));
+                scoreboardLines.add(miniMessage.deserialize("Team Capital: <bold>" + (!zones.getTerritory(originChunk.getX(), originChunk.getZ()).isEmpty() && zones.getTerritory(originChunk.getX(), originChunk.getZ()).getBoolean("capital") ? "<green>Yes</green>" : "<red>No</red>")));
+                scoreboardLines.add(blank);
+                if (teams.getTeamIndexFromPlayer(player.getUniqueId()) > -1) {
+                    scoreboardLines.add(miniMessage.deserialize("<#" + teamHexColor + ">" + teams.getTeamName(teams.getTeamIndexFromPlayer(player.getUniqueId()))));
+                    if (zones.getTerritories().isEmpty()) {
+                        scoreboardLines.add(noZones1);
+                        scoreboardLines.add(noZones2);
+                    }
+                    else {
+                        scoreboardLines.add(miniMessage.deserialize("Claimed Zones: <aqua>" + zones.getTeamTerritories(teamIdx).length() + "</aqua>/<dark_aqua>" + (zones.getTerritories().length() - 4) + "</dark_aqua> (<dark_green>" + ((float) zones.getTeamTerritories(teamIdx).length() / (zones.getTerritories().length() - 4)) * 100 + "%</dark_green>)"));
+                        scoreboardLines.add(miniMessage.deserialize("Capitals: " + (!zones.getCapitalTerritories(teamIdx).isEmpty() ? "<green>" : "<red>") + zones.getCapitalTerritories(teamIdx).length()));
+                    }
+                    scoreboardLines.add(blank);
+                    scoreboardLines.add(teamMembersTitle);
+                    teamsConfigCache.forEach(obj ->
+                            ((JSONObject) obj).getJSONArray("members").forEach(obj1 -> {
+                                boolean online = false;
+                                if (plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj1).getString("uuid"))) != null) {
+                                    online = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj1).getString("uuid"))).isOnline();
+                                }
+                                scoreboardLines.add(MiniMessage.miniMessage().deserialize("    " + (online ? "<green>" : "<gray>") + ((JSONObject) obj1).getString("username") + (!online ? " (Offline)" : "")));
+                            })
+                    );
+                }
+                else {
+                    scoreboardLines.add(notInTeam);
+                }
+
+                for (int i = 0; i < 31; i++) {
+                    Team team = scoreboard.getTeam("line_" + i);
+                    if (team == null) continue;
+
+                    String entryKey = "§" + Integer.toHexString(i) + "§r";
+
+                    if (i < scoreboardLines.size()) {
+                        team.prefix(scoreboardLines.get(i));
+
+                        Score score = objective.getScore(entryKey);
+                        score.setScore(scoreboardLines.size() - i);
+
+                        score.numberFormat(io.papermc.paper.scoreboard.numbers.NumberFormat.fixed(Component.empty()));
+                    } else {
+                        team.prefix(Component.empty());
+                        scoreboard.resetScores(entryKey);
+                    }
+                }
+            }
+        }, 0L, 2L);
     }
 
+    private JSONArray teamsConfigCache;
+
+    public void updateTeamCache() {
+        teamsConfigCache = pluginData.getTeamsConfig();
+    }
 }
