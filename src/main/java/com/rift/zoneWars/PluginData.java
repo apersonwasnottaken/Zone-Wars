@@ -64,8 +64,27 @@ public class PluginData {
         return data;
     }
 
+    public void writeData() {
+        try {
+            if (Files.exists(dataFilePath)) {
+                Files.writeString(dataFilePath, data.toString());
+            }
+            else {
+                if (dataFilePath.getParent() != null) {
+                    Files.createDirectories(dataFilePath.getParent());
+                }
+                Files.createFile(dataFilePath);
+                Files.writeString(dataFilePath, data.toString());
+                data = defaultEntry;
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public void updateData(JSONObject newData) {
         data = newData;
+        writeData();
     }
 
     public JSONArray getTeamsConfig() {

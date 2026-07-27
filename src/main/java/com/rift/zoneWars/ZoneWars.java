@@ -46,11 +46,15 @@ public final class ZoneWars extends JavaPlugin {
         teams = new Teams(this, pluginData);
         zones = new Zones(this, pluginData, teams);
         claimZoneEventManager = new ClaimZoneEventManager(this, zones);
-        mainGameLoop = new MainGameLoop(this, zones, teams, claimZoneEventManager);
+        mainGameLoop = new MainGameLoop(this, pluginData, zones, teams, claimZoneEventManager);
         mainGameLoop.startGameLoop();
 
         commandRegistration = new CommandRegistration(this, this.getLifecycleManager(), zones, teams, pluginData, claimZoneEventManager);
         commandRegistration.registerCommand(this.getLifecycleManager());
+    }
+
+    public MainGameLoop getMainGameLoop() {
+        return this.mainGameLoop;
     }
 
     @Override

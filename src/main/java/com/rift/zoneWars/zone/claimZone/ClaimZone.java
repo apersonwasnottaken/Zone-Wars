@@ -2,14 +2,20 @@ package com.rift.zoneWars.zone.claimZone;
 
 import com.rift.zoneWars.Teams;
 import com.rift.zoneWars.ZoneWars;
+import com.rift.zoneWars.zone.Zones;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.title.Title;
+import org.bukkit.Sound;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 import org.json.JSONObject;
 
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class ClaimZone {
 
@@ -19,17 +25,20 @@ public class ClaimZone {
     private final int invader, defender;
     private BukkitTask timer;
     private final Teams teams;
-    private JSONObject zone;
+    private final Zones zones;
+    private final JSONObject zone;
     private Consumer<EventOutcome> endCallback;
     private boolean isEnded = false;
+    private static int countdown;
 
-    public ClaimZone(ZoneWars plugin, Teams teams, int invader, int defender, JSONObject zone) {
+    public ClaimZone(ZoneWars plugin, Teams teams, Zones zones, int invader, int defender, JSONObject zone) {
         this.plugin = plugin;
         this.eventID = UUID.randomUUID();
         this.secondsRemaining = 120;
         this.invader = invader;
         this.defender = defender;
         this.teams = teams;
+        this.zones = zones;
         this.zone = zone;
     }
 
@@ -38,10 +47,37 @@ public class ClaimZone {
     }
 
     public void startClaimZone(Consumer<EventOutcome> onEndCallback) {
+        if (zone.getBoolean("capital")) {
+            secondsRemaining = 60 * 15;
+        }
+        else {
+            secondsRemaining = 120;
+        }
         this.endCallback = onEndCallback;
+        teams.getTeamMembers(defender).forEach(obj -> {
+            Player player = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj).getString("uuid")));
+            if (player != null && player.isOnline()) {
+                if (zone.getBoolean("capital")) {
+                    player.playSound((net.kyori.adventure.sound.Sound) Sound.ENTITY_WITHER_SPAWN);
+                    player.playSound((net.kyori.adventure.sound.Sound) Sound.ENTITY_WITHER_DEATH);
+                    player.playSound((net.kyori.adventure.sound.Sound) Sound.ENTITY_ELDER_GUARDIAN_CURSE);
+                }
+                else {
+                    player.playSound((net.kyori.adventure.sound.Sound) Sound.BLOCK_BELL_USE);
+                    player.playSound((net.kyori.adventure.sound.Sound) Sound.BLOCK_NOTE_BLOCK_PLING);
+                }
+            }
+        });
         this.timer = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
             if (secondsRemaining <= 0) {
+                teams.getTeamMembers(defender).forEach(obj -> {
+                    Player player = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj).getString("uuid")));
+                    if (player != null && player.isOnline()) {
+                        player.setGlowing(false);
+                    }
+                });
                 complete(EventOutcome.SUCCESS);
+
                 return;
             }
 
@@ -51,7 +87,6 @@ public class ClaimZone {
                     player.sendActionBar(net.kyori.adventure.text.Component.text(
                             "You must hold the territory for " + secondsRemaining + " more seconds!"
                     ));
-                    player.setGlowing(true);
                 }
             });
 
@@ -62,6 +97,8 @@ public class ClaimZone {
                     player.sendMessage(MiniMessage.miniMessage().deserialize(String.format("""
 The territory at <yellow>(%d, %d)</yellow> is being raided by another team!
 """, zone.getInt("chunk_region_x") * 16, zone.getInt("chunk_region_z") * 16)));
+                    Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).setBaseValue(zones.getMaxHealth(player) + 2);
+                    player.setGlowing(true);
                 }
             });
             secondsRemaining--;
@@ -102,5 +139,26 @@ The territory at <yellow>(%d, %d)</yellow> is being raided by another team!
     }
     public int getSecondsRemaining() {
         return secondsRemaining;
+    }
+    public static void cooldown(){
+        Timer timer=new Timer();
+        countdown=120;
+        TimerTask task=new TimerTask(){
+            @Override
+            public void run(){
+                if (countdown>0) {
+                    countdown--;
+                }else{
+                    timer.cancel();
+                }
+            }
+        };
+        timer.scheduleAtFixedRate(task,0,1000);
+    }
+    public static boolean cooldownCheck(){
+        if (countdown==0){
+            return true;
+        }
+        return false;
     }
 }
