@@ -3,6 +3,7 @@ package com.rift.zoneWars.zone.claimZone;
 import com.rift.zoneWars.Teams;
 import com.rift.zoneWars.ZoneWars;
 import com.rift.zoneWars.zone.Zones;
+import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Sound;
@@ -11,8 +12,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 import org.json.JSONObject;
 
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Consumer;
 
 public class ClaimZone {
@@ -27,6 +27,7 @@ public class ClaimZone {
     private final JSONObject zone;
     private Consumer<EventOutcome> endCallback;
     private boolean isEnded = false;
+    private static int countdown;
 
     public ClaimZone(ZoneWars plugin, Teams teams, Zones zones, int invader, int defender, JSONObject zone) {
         this.plugin = plugin;
@@ -55,13 +56,13 @@ public class ClaimZone {
             Player player = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj).getString("uuid")));
             if (player != null && player.isOnline()) {
                 if (zone.getBoolean("capital")) {
-                    player.playSound((net.kyori.adventure.sound.Sound) Sound.ENTITY_WITHER_SPAWN);
-                    player.playSound((net.kyori.adventure.sound.Sound) Sound.ENTITY_WITHER_DEATH);
-                    player.playSound((net.kyori.adventure.sound.Sound) Sound.ENTITY_ELDER_GUARDIAN_CURSE);
+                    player.playSound(net.kyori.adventure.sound.Sound.sound(Key.key("entity.wither.spawn"), net.kyori.adventure.sound.Sound.Source.NEUTRAL, 1, 1));
+                    player.playSound(net.kyori.adventure.sound.Sound.sound(Key.key("entity.wither.death"), net.kyori.adventure.sound.Sound.Source.NEUTRAL, 1, 1));
+                    player.playSound(net.kyori.adventure.sound.Sound.sound(Key.key("entity.elder_guardian.curse"), net.kyori.adventure.sound.Sound.Source.NEUTRAL, 1, 1));
                 }
                 else {
-                    player.playSound((net.kyori.adventure.sound.Sound) Sound.BLOCK_BELL_USE);
-                    player.playSound((net.kyori.adventure.sound.Sound) Sound.BLOCK_NOTE_BLOCK_PLING);
+                    player.playSound(net.kyori.adventure.sound.Sound.sound(Key.key("block.bell.use"), net.kyori.adventure.sound.Sound.Source.NEUTRAL, 1, 1));
+                    player.playSound(net.kyori.adventure.sound.Sound.sound(Key.key("block.note_block.pling"), net.kyori.adventure.sound.Sound.Source.NEUTRAL, 1, 1));
                 }
             }
         });
@@ -80,9 +81,10 @@ public class ClaimZone {
             teams.getTeamMembers(invader).forEach(obj -> {
                 Player player = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj).getString("uuid")));
                 if (player != null && player.isOnline()) {
-                    player.sendActionBar(net.kyori.adventure.text.Component.text(
-                            "You must hold the territory for " + secondsRemaining + " more seconds!"
+                    player.sendActionBar(MiniMessage.miniMessage().deserialize(
+                            "You must hold the territory for <green>" + secondsRemaining + "</green> more seconds!"
                     ));
+                    player.playSound(net.kyori.adventure.sound.Sound.sound(Key.key("ui.button.click"), net.kyori.adventure.sound.Sound.Source.NEUTRAL, 1, 1));
                 }
             });
 
@@ -97,7 +99,27 @@ The territory at <yellow>(%d, %d)</yellow> is being raided by another team!
                     player.setGlowing(true);
                 }
             });
+            Map<UUID, Integer> teamInTerritory = new HashMap<>();
+            for (Player player : zones.getPlayersInTerritory(zone.getInt("chunk_region_x"), zone.getInt("chunk_region_z"))) {
+                if (teamInTerritory.containsKey(teams.getTeamUUID(teams.getTeamIndexFromPlayer(player.getUniqueId())))) {
+                    teamInTerritory.put(teams.getTeamUUID(teams.getTeamIndexFromPlayer(player.getUniqueId())), teamInTerritory.get(teams.getTeamUUID(teams.getTeamIndexFromPlayer(player.getUniqueId()))) + 1);
+                }
+                else {
+                    teamInTerritory.put(teams.getTeamUUID(teams.getTeamIndexFromPlayer(player.getUniqueId())), 1);
+                }
+            }
             secondsRemaining--;
+            int defendingPlayers = 0;
+            if (teamInTerritory.get(UUID.fromString(zone.get("team").toString())) != null) {
+                defendingPlayers = teamInTerritory.get(UUID.fromString(zone.get("team").toString()));
+            }
+            if (!teamInTerritory.containsKey(teams.getTeamUUID(invader))) fail();
+            for (Map.Entry<UUID, Integer> team : teamInTerritory.entrySet()) {
+                plugin.getComponentLogger().info(String.valueOf(team.getValue()));
+                if (team.getValue() - 2 + 1 < defendingPlayers) {
+                    fail();
+                }
+            }
         }, 0L, 20L);
     }
 

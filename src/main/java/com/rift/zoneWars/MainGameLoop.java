@@ -36,11 +36,16 @@ public class MainGameLoop {
             for (Player player : plugin.getServer().getOnlinePlayers()) {
                 // Spawn particles in a 2 radius chunk area
                 World world = plugin.getServer().getWorld("world");
-                Chunk originChunk = world.getChunkAt(player.getLocation());
+                if (!zones.findTerritoryFromLocation(player.getLocation()).has("chunk_region_x") || !zones.findTerritoryFromLocation(player.getLocation()).has("chunk_region_z")) {
+                    continue;
+                }
+                int originX = zones.findTerritoryFromLocation(player.getLocation()).getInt("chunk_region_x");
+                int originZ = zones.findTerritoryFromLocation(player.getLocation()).getInt("chunk_region_z");
+
                 List<List<Integer>> alreadyDrawn = new ArrayList<>();
                 int radius = 4;
-                for (int tx = -radius + originChunk.getX(); tx <= radius + originChunk.getX(); tx += 2) {
-                    for (int tz = -radius + originChunk.getZ(); tz <= radius + originChunk.getZ(); tz += 2) {
+                for (int tx = originX - radius; tx <= originX + radius; tx += 2) {
+                    for (int tz = originZ - radius; tz <= originZ + radius; tz += 2) {
                         if (alreadyDrawn.contains(List.of(tx, tz))) {
                             continue;
                         }
@@ -54,15 +59,34 @@ public class MainGameLoop {
                                 UUID.fromString(
                                         zones.getTerritory(tx, tz).get("team").toString()
                                 )));
-                        Particle.DustOptions dustOptions = new Particle.DustOptions(Color.fromRGB(teamColor), 2.0f);
+                        Particle.DustOptions dustOptions = new Particle.DustOptions(Color.fromRGB(teamColor), 3.0f);
+                        Location loc;
                         int step = 4;
                         for (double x = minX; x <= maxX; x += step) {
-                            world.spawnParticle(Particle.DUST, new Location(world, x, world.getHighestBlockYAt((int) x, (int) minZ, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 2, minZ), 1, 0, 0, 0, 0, dustOptions);
-                            world.spawnParticle(Particle.DUST, new Location(world, x, world.getHighestBlockYAt((int) x, (int) maxZ, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 2, maxZ), 1, 0, 0, 0, 0, dustOptions);
+                            assert world != null;
+                            loc = GetZoneBorderBlockLocation.findClosestAirOnSolidBlock(world, (int) x, (int) minZ, (int) player.getY(), 5);
+                            if (loc != null) {
+                                loc.add(0.5, 1, 0.5);
+                                world.spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, dustOptions);
+                            }
+                            loc = GetZoneBorderBlockLocation.findClosestAirOnSolidBlock(world, (int) x, (int) maxZ, (int) player.getY(), 5);
+                            if (loc != null) {
+                                loc.add(0.5, 1, 0.5);
+                                world.spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, dustOptions);
+                            }
                         }
                         for (double z = minZ; z <= maxZ; z += step) {
-                            world.spawnParticle(Particle.DUST, new Location(world, minX, world.getHighestBlockYAt((int) minX, (int) z, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 2, z), 1, 0, 0, 0, 0, dustOptions);
-                            world.spawnParticle(Particle.DUST, new Location(world, maxX, world.getHighestBlockYAt((int) maxX, (int) z, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 2, z), 1, 0, 0, 0, 0, dustOptions);
+                            assert world != null;
+                            loc = GetZoneBorderBlockLocation.findClosestAirOnSolidBlock(world, (int) minX, (int) z, (int) player.getY(), 5);
+                            if (loc != null) {
+                                loc.add(0.5, 1, 0.5);
+                                world.spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, dustOptions);
+                            }
+                            loc = GetZoneBorderBlockLocation.findClosestAirOnSolidBlock(world, (int) maxX, (int) z, (int) player.getY(), 5);
+                            if (loc != null) {
+                                loc.add(0.5, 1, 0.5);
+                                world.spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, dustOptions);
+                            }
                         }
                         alreadyDrawn.add(List.of(tx, tz));
                     }
@@ -107,9 +131,9 @@ public class MainGameLoop {
                 }
                 int defendingPlayers = teamInTerritory.get(UUID.fromString(territory.get("team").toString()));
                 Object teamObj = territory.get("team");
-                if (teamObj == null || Objects.equals(teamObj.toString(), "-1")) return;
+                if (teamObj == null || Objects.equals(teamObj.toString(), "-1")) continue;
                 int teamIndex = teams.getTeamIndexFromUUID(UUID.fromString(teamObj.toString()));
-                if (teamIndex == -1) return;
+                if (teamIndex == -1) continue;
                 List<?> members = teams.getTeamMembers(teamIndex).toList();
                 long onlineDefendingTeamMembers = members.stream()
                         .map(obj -> ((java.util.Map<?, ?>) obj).get("uuid").toString())
@@ -139,6 +163,7 @@ public class MainGameLoop {
         plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
             for (Player player : plugin.getServer().getOnlinePlayers()) {
                 World world = plugin.getServer().getWorld("world");
+                assert world != null;
                 Chunk originChunk = world.getChunkAt(player.getLocation());
                 // Scoreboard
                 Scoreboard scoreboard = player.getScoreboard();

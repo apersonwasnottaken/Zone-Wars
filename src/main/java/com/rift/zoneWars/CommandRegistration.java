@@ -88,16 +88,30 @@ Is team capital? %s
                                 return Command.SINGLE_SUCCESS;
                             }))
                     .then(opBranch("start_territory_claim")
-                            .then(Commands.argument("invading_team_index", IntegerArgumentType.integer(0)))
-                            .then(Commands.argument("defending_team_index", IntegerArgumentType.integer(0)))
-                            .executes(ctx -> {
-                                if (ctx.getSource().getExecutor() == null) {
-                                    logger.warn("Command must be executed by a player!");
-                                    return -1;
-                                }
-                                claimZoneEventManager.startNewClaim(teams, ctx.getArgument("invading_team_index", int.class), ctx.getArgument("defending_team_index", int.class), zones.findTerritoryFromLocation(ctx.getSource().getLocation()));
-                                return Command.SINGLE_SUCCESS;
-                            })
+                            .then(Commands.argument("invading_team", ArgumentTypes.uuid())
+                                    .suggests((ctx, builder) -> {
+                                        teams.getAllTeamUUIDs().stream()
+                                                .map(UUID::toString)
+                                                .forEach(builder::suggest);
+                                        return builder.buildFuture();
+                                    })
+                                    .then(Commands.argument("defending_team", ArgumentTypes.uuid())
+                                            .suggests((ctx, builder) -> {
+                                                teams.getAllTeamUUIDs().stream()
+                                                        .map(UUID::toString)
+                                                        .forEach(builder::suggest);
+                                                return builder.buildFuture();
+                                            })
+                                            .executes(ctx -> {
+                                                if (ctx.getSource().getExecutor() == null) {
+                                                    logger.warn("Command must be executed by a player!");
+                                                    return -1;
+                                                }
+                                                claimZoneEventManager.startNewClaim(teams, teams.getTeamIndexFromUUID(ctx.getArgument("invading_team", UUID.class)), teams.getTeamIndexFromUUID(ctx.getArgument("defending_team", UUID.class)), zones.findTerritoryFromLocation(ctx.getSource().getLocation()));
+                                                return Command.SINGLE_SUCCESS;
+                                            })
+                                    )
+                            )
                     )
                     .then(opBranch("create_capital")
                             .then(Commands.argument("team", ArgumentTypes.uuid())
@@ -270,6 +284,8 @@ Is team capital? %s
                     .then(opBranch("toggle_claiming")
                             .executes(ctx -> {
                                 plugin.getConfig().set("claiming_enabled", !plugin.getConfig().getBoolean("claiming_enabled"));
+                                plugin.saveConfig();
+                                ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("Toggled claiming state to <bold>" + (plugin.getConfig().getBoolean("claiming_enabled") ? "<green>true" : "<red>false")));
                                 return Command.SINGLE_SUCCESS;
                             }))
                     .build();

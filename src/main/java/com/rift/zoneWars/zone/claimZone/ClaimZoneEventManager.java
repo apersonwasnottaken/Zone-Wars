@@ -3,6 +3,7 @@ package com.rift.zoneWars.zone.claimZone;
 import com.rift.zoneWars.Teams;
 import com.rift.zoneWars.ZoneWars;
 import com.rift.zoneWars.zone.Zones;
+import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Sound;
@@ -27,12 +28,16 @@ public class ClaimZoneEventManager {
     }
 
     public void startNewClaim(Teams teams, int invader, int defender, JSONObject zone) {
-        if (!plugin.getConfig().getBoolean("claiming_enabled")) return;
+        if (!plugin.getConfig().getBoolean("claiming_enabled")) {
+            plugin.getComponentLogger().warn("Claiming isn't enabled!");
+            return;
+        }
         int zoneChunkX = zone.getInt("chunk_region_x");
         int zoneChunkZ = zone.getInt("chunk_region_z");
         for (ClaimZone claimZone : activeEvents.values()) {
             if (claimZone.getInvader() == invader && claimZone.getDefender() == defender) {
                 if (claimZone.getZone().getInt("chunk_region_x") == zoneChunkX && claimZone.getZone().getInt("chunk_region_z") == zoneChunkZ) {
+                    plugin.getComponentLogger().warn("A similar claim already exists!");
                     return; // Such claim already exists and should not be duplicated
                 }
             }
@@ -43,6 +48,7 @@ public class ClaimZoneEventManager {
                     (!zones.getTerritory(zoneChunkX, zoneChunkZ - 2).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX, zoneChunkZ - 2).getString("team").toString())) == invader) ||
                     (!zones.getTerritory(zoneChunkX, zoneChunkZ + 2).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX, zoneChunkZ + 2).getString("team").toString())) == invader))
         ) {
+            plugin.getComponentLogger().warn("The territory is not adjacent to one of the attacker's territories!");
             return;
         }
 
@@ -53,7 +59,7 @@ public class ClaimZoneEventManager {
             activeEvents.remove(id);
             if (outcome == EventOutcome.SUCCESS) {
                 // Transfer ownership of territory
-                zones.updateTerritory(zone.put("team", invader));
+                zones.updateTerritory(zone.put("team", teams.getTeamUUID(invader)));
                 Component invaderMessage;
                 Component defenderMessage;
                 if (zone.getBoolean("capital")) {
@@ -65,7 +71,7 @@ public class ClaimZoneEventManager {
                     zones.getTeamTerritories(defender).forEach(obj -> {
                         JSONObject teamZone = (JSONObject) obj;
                         if (random.nextInt(capitalTerritoryCount) == 0) {
-                            zones.updateTerritory(teamZone.put("team", invader));
+                            zones.updateTerritory(teamZone.put("team", teams.getTeamUUID(invader)));
                             lostTerritory.getAndIncrement();
                         }
                     });
@@ -87,7 +93,7 @@ public class ClaimZoneEventManager {
                     if (player != null && player.isOnline()) {
                         Random random = new Random();
                         if (zone.getBoolean("capital")) {
-                            player.playSound((net.kyori.adventure.sound.Sound) (random.nextInt(2) == 1 ? Sound.ITEM_GOAT_HORN_SOUND_3 : Sound.ITEM_GOAT_HORN_SOUND_5));
+                            player.playSound(net.kyori.adventure.sound.Sound.sound(Key.key(random.nextInt(2) == 1 ? "item.goat_horn.sound.3" : "item.goat_horn.sound.5"), net.kyori.adventure.sound.Sound.Source.NEUTRAL, 1, 1));
                             AtomicInteger count = new AtomicInteger();
                             plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
                                 plugin.getServer().getWorld("world").spawnEntity(player.getLocation(), EntityType.FIREWORK_ROCKET);
@@ -95,8 +101,8 @@ public class ClaimZoneEventManager {
                             }, 0L, 10L);
                         }
                         else {
-                            player.playSound((net.kyori.adventure.sound.Sound) (random.nextInt(2) == 1 ? Sound.ITEM_GOAT_HORN_SOUND_1 : Sound.ITEM_GOAT_HORN_SOUND_6));
-                            player.playSound((net.kyori.adventure.sound.Sound) Sound.ENTITY_PLAYER_LEVELUP);
+                            player.playSound(net.kyori.adventure.sound.Sound.sound(Key.key(random.nextInt(2) == 1 ? "item.goat_horn.sound.1" : "item.goat_horn.sound.6"), net.kyori.adventure.sound.Sound.Source.NEUTRAL, 1, 1));
+                            player.playSound(net.kyori.adventure.sound.Sound.sound(Key.key("entity.player_levelup"), net.kyori.adventure.sound.Sound.Source.NEUTRAL, 1, 1));
                         }
                         player.sendMessage(invaderMessage);
                     }
@@ -113,6 +119,8 @@ public class ClaimZoneEventManager {
                         player.sendMessage(defenderMessage);
                     }
                 });
+                ClaimZoneCooldown cooldown = new ClaimZoneCooldown(plugin, teams, invader);
+                cooldown.startCooldown();
             }
             else if (outcome == EventOutcome.FAILURE) {
                 // Reset timer
@@ -120,6 +128,8 @@ public class ClaimZoneEventManager {
                     Player player = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj).getString("uuid")));
                     if (player != null && player.isOnline()) {
                         player.sendMessage(MiniMessage.miniMessage().deserialize("<red>You have lost the advantage, the timer has been reset."));
+                        player.playSound(net.kyori.adventure.sound.Sound.sound(Key.key("entity.wither.block_break"), net.kyori.adventure.sound.Sound.Source.NEUTRAL, 1, 1));
+                        player.sendActionBar(MiniMessage.miniMessage().deserialize("<red>Advantage lost!"));
                     }
                 });
             }
