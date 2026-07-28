@@ -21,9 +21,12 @@ import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.checkerframework.checker.units.qual.N;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -210,7 +213,7 @@ Is team capital? %s
                                         <yellow>List of Teams</yellow>
                                         """);
                                 for (Object obj : pluginData.getTeamsConfig()) {
-                                    message.append("<#" + Integer.toHexString(((JSONObject) obj).getInt("color")) + "><hover:show_text:\"<aqua>Click to view team info!\"><click:run_command:/zw get_team_info ").append(((JSONObject) obj).getString("id")).append(">").append(((JSONObject) obj).getString("name")).append("</click>\n");
+                                    message.append("<#").append(Integer.toHexString(((JSONObject) obj).getInt("color"))).append("><hover:show_text:\"<aqua>Click to view team info!\"><click:run_command:/zw get_team_info ").append(((JSONObject) obj).getString("id")).append(">").append(((JSONObject) obj).getString("name")).append("</click>\n");
                                 }
                                 ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize(message.toString()));
                                 return Command.SINGLE_SUCCESS;
@@ -301,6 +304,23 @@ Is team capital? %s
                             .executes(ctx -> {
                                 zones.resetZones();
                                 ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Zones deleted successfully!"));
+                                return Command.SINGLE_SUCCESS;
+                            }))
+                    .then(Commands.literal("toggle_zone_particles")
+                            .executes(ctx -> {
+                                if (!(ctx.getSource().getExecutor() instanceof Player)) {
+                                    logger.warn("Command must be executed by a player!");
+                                    return 1;
+                                }
+                                NamespacedKey particlesKey = new NamespacedKey(plugin, "particles");
+                                Player player = (Player) ctx.getSource().getExecutor();
+                                if (player.getPersistentDataContainer().has(particlesKey) && player.getPersistentDataContainer().get(particlesKey, PersistentDataType.BOOLEAN) != null) {
+                                    player.getPersistentDataContainer().set(particlesKey, PersistentDataType.BOOLEAN, !player.getPersistentDataContainer().get(particlesKey, PersistentDataType.BOOLEAN));
+                                }
+                                else {
+                                    player.getPersistentDataContainer().set(particlesKey, PersistentDataType.BOOLEAN, false);
+                                }
+                                player.sendMessage(MiniMessage.miniMessage().deserialize("Territory particles set to: <bold>" + (player.getPersistentDataContainer().get(particlesKey, PersistentDataType.BOOLEAN) ? "<green>ON" : "<red>OFF")));
                                 return Command.SINGLE_SUCCESS;
                             }))
                     .build();

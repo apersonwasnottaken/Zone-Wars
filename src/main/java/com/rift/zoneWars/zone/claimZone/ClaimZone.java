@@ -46,7 +46,7 @@ public class ClaimZone {
 
     public void startClaimZone(Consumer<EventOutcome> onEndCallback) {
         if (zone.getBoolean("capital")) {
-            secondsRemaining = 60 * 15;
+            secondsRemaining = (int) (60 * 5 + (double) (25 * (zones.getTeamTerritoryCount(defender) / zones.getDefaultTerritoryAmount())));
         }
         else {
             secondsRemaining = 120;

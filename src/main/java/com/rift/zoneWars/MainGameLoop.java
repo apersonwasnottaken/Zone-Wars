@@ -7,6 +7,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scoreboard.*;
@@ -33,7 +34,25 @@ public class MainGameLoop {
 
     public void startGameLoop() {
         plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+            List<List<Integer>> alreadyDrawn = new ArrayList<>();
             for (Player player : plugin.getServer().getOnlinePlayers()) {
+                // Every (200 / amount of teams) pieces of land = 1/2 a heart
+                if (zones.getDefaultTerritoryAmount() > 0) {
+                    int maxHealth = zones.getMaxHealth(player);
+                    Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).setBaseValue(maxHealth);
+                }
+                // Player buffs for capital
+                if (!zones.findTerritoryFromLocation(player.getLocation()).isEmpty()) {
+                    if (
+                            zones.findTerritoryFromLocation(player.getLocation()).getBoolean(("capital")) &&
+                            teams.getTeamIndexFromUUID(UUID.fromString(zones.findTerritoryFromLocation(player.getLocation()).get("team").toString())) == teams.getTeamIndexFromPlayer(player.getUniqueId())
+                    ) {
+                        player.addPotionEffect(new PotionEffect(PotionEffectType.HEALTH_BOOST, 20, 3, true));
+                        player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 20, 0, true));
+                        player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 20, 0, true));
+                    }
+                }
+
                 // Spawn particles in a 2 radius chunk area
                 World world = plugin.getServer().getWorld("world");
                 if (!zones.findTerritoryFromLocation(player.getLocation()).has("chunk_region_x") || !zones.findTerritoryFromLocation(player.getLocation()).has("chunk_region_z")) {
@@ -42,7 +61,13 @@ public class MainGameLoop {
                 int originX = zones.findTerritoryFromLocation(player.getLocation()).getInt("chunk_region_x");
                 int originZ = zones.findTerritoryFromLocation(player.getLocation()).getInt("chunk_region_z");
 
-                List<List<Integer>> alreadyDrawn = new ArrayList<>();
+                NamespacedKey particlesKey = new NamespacedKey(plugin, "particles");
+                if (player.getPersistentDataContainer().has(particlesKey) && player.getPersistentDataContainer().get(particlesKey, PersistentDataType.BOOLEAN) != null) {
+                    if (!player.getPersistentDataContainer().get(particlesKey, PersistentDataType.BOOLEAN)) {
+                        continue;
+                    }
+                }
+
                 int radius = 4;
                 for (int tx = originX - radius; tx <= originX + radius; tx += 2) {
                     for (int tz = originZ - radius; tz <= originZ + radius; tz += 2) {
@@ -90,22 +115,6 @@ public class MainGameLoop {
                             }
                         }
                         alreadyDrawn.add(List.of(tx, tz));
-                    }
-                }
-                // Every (200 / amount of teams) pieces of land = 1/2 a heart
-                if (zones.getDefaultTerritoryAmount() > 0) {
-                    int maxHealth = zones.getMaxHealth(player);
-                    Objects.requireNonNull(player.getAttribute(Attribute.MAX_HEALTH)).setBaseValue(maxHealth);
-                }
-                // Player buffs for capital
-                if (!zones.findTerritoryFromLocation(player.getLocation()).isEmpty()) {
-                    if (
-                            zones.findTerritoryFromLocation(player.getLocation()).getBoolean(("capital")) &&
-                            teams.getTeamIndexFromUUID(UUID.fromString(zones.findTerritoryFromLocation(player.getLocation()).get("team").toString())) == teams.getTeamIndexFromPlayer(player.getUniqueId())
-                    ) {
-                        player.addPotionEffect(new PotionEffect(PotionEffectType.HEALTH_BOOST, 20, 3, true));
-                        player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 20, 0, true));
-                        player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 20, 0, true));
                     }
                 }
             }
