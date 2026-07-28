@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/zonewarsgithub.iml" filepath="$PROJECT_DIR$/.idea/zonewarsgithub.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Zone_Wars.main.iml" filepath="$PROJECT_DIR$/.idea/modules/Zone_Wars.main.iml" />
     </modules>
   </component>
 </project>

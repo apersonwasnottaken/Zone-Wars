@@ -1,5 +1,7 @@
 package com.rift.zoneWars;
 
+import com.destroystokyo.paper.profile.PlayerProfile;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -27,7 +29,7 @@ public class Teams {
             for (int j = 0; j < teamMembers.length(); j++) {
                 JSONObject member = teamMembers.getJSONObject(j);
                 try {
-                    UUID uuid = UUID.fromString(member.getString("uuid"));
+                    UUID uuid = UUID.fromString(member.get("uuid").toString());
                     playerTeamCache.put(uuid, i);
                 } catch (IllegalArgumentException e) {
                 }
@@ -46,16 +48,16 @@ public class Teams {
     }
 
     public void deleteTeam(UUID teamUUID) {
-        updateTeams();
         for (int i = 0; i < teamsData.length(); i++) {
             if (Objects.equals(((JSONObject) teamsData.get(i)).get("id").toString(), teamUUID.toString())) {
                 teamsData.remove(i);
+                updateTeams();
                 break;
             }
         }
     }
 
-    public void addMemberToTeam(int teamIdx, Player member) {
+    public void addMemberToTeam(int teamIdx, PlayerProfile member) {
         for (int i = 0; i < ((JSONObject) teamsData.get(teamIdx)).getJSONArray("members").length(); i++) {
             if (Objects.equals(((JSONObject) ((JSONObject) teamsData.get(teamIdx)).getJSONArray("members").get(i)).get("uuid").toString(), member.getUniqueId().toString())) {
                 return;
@@ -65,7 +67,7 @@ public class Teams {
         updateTeams();
     }
 
-    public void removeMemberFromTeam(int teamIdx, Player member) {
+    public void removeMemberFromTeam(int teamIdx, PlayerProfile member) {
         for (int i = 0; i < ((JSONObject) teamsData.get(teamIdx)).getJSONArray("members").length(); i++) {
             if (Objects.equals(((JSONObject) ((JSONObject) teamsData.get(teamIdx)).getJSONArray("members").get(i)).get("uuid").toString(), member.getUniqueId().toString())) {
                 ((JSONObject) teamsData.get(teamIdx)).getJSONArray("members").remove(i);

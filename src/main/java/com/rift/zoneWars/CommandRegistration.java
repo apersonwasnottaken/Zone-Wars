@@ -1,5 +1,6 @@
 package com.rift.zoneWars;
 
+import com.destroystokyo.paper.profile.PlayerProfile;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -11,6 +12,7 @@ import com.rift.zoneWars.zone.claimZone.ClaimZoneEventManager;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.PlayerProfileListResolver;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 import io.papermc.paper.plugin.lifecycle.event.LifecycleEventManager;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
@@ -19,15 +21,13 @@ import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 public class CommandRegistration {
 
@@ -226,36 +226,37 @@ Is team capital? %s
                                     .then(Commands.literal("delete")
                                             .executes(ctx -> {
                                                 teams.deleteTeam(UUID.fromString(ctx.getArgument("team_id", String.class)));
+                                                ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("Team deleted!"));
                                                 return Command.SINGLE_SUCCESS;
                                             })
                                     )
                                     .then(Commands.literal("add_team_member")
-                                            .then(Commands.argument("team_member", ArgumentTypes.player())
+                                            .then(Commands.argument("team_member", ArgumentTypes.playerProfiles())
                                                     .executes(ctx -> {
-                                                        var selector = ctx.getArgument("team_member", PlayerSelectorArgumentResolver.class);
-                                                        List<Player> players = selector.resolve(ctx.getSource());
-                                                        if (players.isEmpty()) {
+                                                        var selector = ctx.getArgument("team_member", PlayerProfileListResolver.class);
+                                                        Collection<PlayerProfile> profiles = selector.resolve(ctx.getSource());
+                                                        if (profiles.isEmpty()) {
                                                             return 0;
                                                         }
-                                                        Player targetPlayer = players.getFirst();
+                                                        PlayerProfile profile = profiles.stream().findFirst().get();
                                                         UUID teamId = UUID.fromString(ctx.getArgument("team_id", String.class));
-                                                        teams.addMemberToTeam(teams.getTeamIndexFromUUID(teamId), targetPlayer);
+                                                        teams.addMemberToTeam(teams.getTeamIndexFromUUID(teamId), profile);
                                                         ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Team member added successfully!"));
                                                         return Command.SINGLE_SUCCESS;
                                                     })
                                             )
                                     )
                                     .then(Commands.literal("remove_team_member")
-                                            .then(Commands.argument("team_member", ArgumentTypes.player())
+                                            .then(Commands.argument("team_member", ArgumentTypes.playerProfiles())
                                                     .executes(ctx -> {
-                                                        var selector = ctx.getArgument("team_member", PlayerSelectorArgumentResolver.class);
-                                                        List<Player> players = selector.resolve(ctx.getSource());
-                                                        if (players.isEmpty()) {
+                                                        var selector = ctx.getArgument("team_member", PlayerProfileListResolver.class);
+                                                        Collection<PlayerProfile> profiles = selector.resolve(ctx.getSource());
+                                                        if (profiles.isEmpty()) {
                                                             return 0;
                                                         }
-                                                        Player targetPlayer = players.getFirst();
+                                                        PlayerProfile profile = profiles.stream().findFirst().get();
                                                         UUID teamId = UUID.fromString(ctx.getArgument("team_id", String.class));
-                                                        teams.removeMemberFromTeam(teams.getTeamIndexFromUUID(teamId), targetPlayer);
+                                                        teams.removeMemberFromTeam(teams.getTeamIndexFromUUID(teamId), profile);
                                                         ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Team member removed successfully!"));
                                                         return Command.SINGLE_SUCCESS;
                                                     })
@@ -286,6 +287,20 @@ Is team capital? %s
                                 plugin.getConfig().set("claiming_enabled", !plugin.getConfig().getBoolean("claiming_enabled"));
                                 plugin.saveConfig();
                                 ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("Toggled claiming state to <bold>" + (plugin.getConfig().getBoolean("claiming_enabled") ? "<green>true" : "<red>false")));
+                                return Command.SINGLE_SUCCESS;
+                            }))
+                    .then(opBranch("reload")
+                            .executes(ctx -> {
+                                teams.updateTeams();
+                                zones.updateTerritories();
+                                plugin.getMainGameLoop().updateTeamCache();
+                                ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Plugin reloaded successfully!"));
+                                return Command.SINGLE_SUCCESS;
+                            }))
+                    .then(opBranch("delete_zones")
+                            .executes(ctx -> {
+                                zones.resetZones();
+                                ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Zones deleted successfully!"));
                                 return Command.SINGLE_SUCCESS;
                             }))
                     .build();

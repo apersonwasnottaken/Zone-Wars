@@ -159,6 +159,11 @@ public class Zones {
         pluginData.updateData(pluginData.readData().put("territories", territories));
     }
 
+    public void resetZones() {
+        territories = new JSONArray();
+        pluginData.updateData(pluginData.readData().put("territories", territories));
+    }
+
     /**
      * Finds and returns the territories that a team has
      * @param teamIdx team index

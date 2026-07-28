@@ -55,6 +55,7 @@ public class MainGameLoop {
                         double minZ = tz * 16 + 0.5;
                         double maxZ = tz * 16 + 31.5;
                         if (zones.getTerritory(tx, tz).isEmpty() || Objects.equals(zones.getTerritory(tx, tz).get("team").toString(), "-1")) continue;
+                        if (teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(tx, tz).get("team").toString())) == -1) continue;
                         int teamColor = teams.getTeamColor(teams.getTeamIndexFromUUID(
                                 UUID.fromString(
                                         zones.getTerritory(tx, tz).get("team").toString()
@@ -113,6 +114,7 @@ public class MainGameLoop {
                 if (territory.isEmpty()) continue;
                 Map<UUID, Integer> teamInTerritory = new HashMap<>();
                 for (Player player : zones.getPlayersInTerritory(territory.getInt("chunk_region_x"), territory.getInt("chunk_region_z"))) {
+                    if (teams.getTeamIndexFromPlayer(player.getUniqueId()) == -1) continue;
                     if (teamInTerritory.containsKey(teams.getTeamUUID(teams.getTeamIndexFromPlayer(player.getUniqueId())))) {
                         teamInTerritory.put(teams.getTeamUUID(teams.getTeamIndexFromPlayer(player.getUniqueId())), teamInTerritory.get(teams.getTeamUUID(teams.getTeamIndexFromPlayer(player.getUniqueId()))) + 1);
                     }
@@ -141,7 +143,7 @@ public class MainGameLoop {
                         .filter(player -> player != null && player.isOnline())
                         .count();
                 for (Map.Entry<UUID, Integer> team : teamInTerritory.entrySet()) {
-                    if (team.getValue() - 2 >= defendingPlayers && onlineDefendingTeamMembers > 0) {
+                    if (team.getValue() - 1 >= defendingPlayers && onlineDefendingTeamMembers > 0) {
                         // Start a claim
                         claimZoneEventManager.startNewClaim(teams, teams.getTeamIndexFromUUID(team.getKey()), territory.getInt("team"), territory);
                         break;
@@ -150,6 +152,10 @@ public class MainGameLoop {
             }
 
         }, 0L, 10L);
+        startScoreboardLoop();
+    }
+
+    public void startScoreboardLoop() {
         MiniMessage miniMessage = MiniMessage.miniMessage();
         final Component title = miniMessage.deserialize("<bold><italic:false><yellow>ZONE WARS</yellow>");
         final Component blank = miniMessage.deserialize("");
@@ -186,7 +192,7 @@ public class MainGameLoop {
 
                 String currentZoneTeamHexColor;
                 String currentZoneTeamName;
-                if (zones.getTerritory(originChunk.getX(), originChunk.getZ()).isEmpty() || Objects.equals(zones.getTerritory(originChunk.getX(), originChunk.getZ()).get("team").toString(), "-1")) {
+                if (zones.getTerritory(originChunk.getX(), originChunk.getZ()).isEmpty() || Objects.equals(zones.getTerritory(originChunk.getX(), originChunk.getZ()).get("team").toString(), "-1") || teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(originChunk.getX(), originChunk.getZ()).get("team").toString())) == -1) {
                     currentZoneTeamHexColor = "ffffff";
                     currentZoneTeamName = "No one!";
                 }
@@ -229,15 +235,20 @@ public class MainGameLoop {
                     }
                     scoreboardLines.add(blank);
                     scoreboardLines.add(teamMembersTitle);
-                    teamsConfigCache.forEach(obj ->
-                            ((JSONObject) obj).getJSONArray("members").forEach(obj1 -> {
-                                boolean online = false;
-                                if (plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj1).getString("uuid"))) != null) {
-                                    online = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj1).getString("uuid"))).isOnline();
-                                }
-                                scoreboardLines.add(MiniMessage.miniMessage().deserialize("    " + (online ? "<green>" : "<gray>") + ((JSONObject) obj1).getString("username") + (!online ? " (Offline)" : "")));
-                            })
-                    );
+                    if (teamIdx < teamsConfigCache.length()) {
+                        JSONObject playerTeam = (JSONObject) teamsConfigCache.get(teamIdx);
+                        playerTeam.getJSONArray("members").forEach(obj1 -> {
+                            JSONObject memberObj = (JSONObject) obj1;
+                            boolean online = false;
+                            Player targetPlayer = plugin.getServer().getPlayer(UUID.fromString(memberObj.getString("uuid")));
+                            if (targetPlayer != null) {
+                                online = targetPlayer.isOnline();
+                            }
+                            scoreboardLines.add(MiniMessage.miniMessage().deserialize(
+                                    "    " + (online ? "<green>" : "<gray>") + memberObj.getString("username") + (!online ? " (Offline)" : "")
+                            ));
+                        });
+                    }
                 }
                 else {
                     scoreboardLines.add(notInTeam);
