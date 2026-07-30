@@ -7,6 +7,7 @@ import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Sound;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.json.JSONObject;
@@ -27,9 +28,9 @@ public class ClaimZoneEventManager {
         this.zones = zones;
     }
 
-    public void startNewClaim(Teams teams, int invader, int defender, JSONObject zone) {
+    public void startNewClaim(Teams teams, int invader, int defender, JSONObject zone, Entity initiator) {
         if (!plugin.getConfig().getBoolean("claiming_enabled")) {
-            plugin.getComponentLogger().warn("Claiming isn't enabled!");
+            initiator.sendMessage(MiniMessage.miniMessage().deserialize("<red>Claiming isn't enabled!"));
             return;
         }
         int zoneChunkX = zone.getInt("chunk_region_x");
@@ -37,18 +38,29 @@ public class ClaimZoneEventManager {
         for (ClaimZone claimZone : activeEvents.values()) {
             if (claimZone.getInvader() == invader && claimZone.getDefender() == defender) {
                 if (claimZone.getZone().getInt("chunk_region_x") == zoneChunkX && claimZone.getZone().getInt("chunk_region_z") == zoneChunkZ) {
-                    plugin.getComponentLogger().warn("A similar claim already exists!");
+                    initiator.sendMessage(MiniMessage.miniMessage().deserialize("<red>A similar claim already exists!"));
                     return; // Such claim already exists and should not be duplicated
                 }
             }
         }
         if (
-                    !((!zones.getTerritory(zoneChunkX - 2, zoneChunkZ).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX - 2, zoneChunkZ).getString("team").toString())) == invader) ||
-                    (!zones.getTerritory(zoneChunkX + 2, zoneChunkZ).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX + 2, zoneChunkZ).getString("team").toString())) == invader) ||
-                    (!zones.getTerritory(zoneChunkX, zoneChunkZ - 2).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX, zoneChunkZ - 2).getString("team").toString())) == invader) ||
-                    (!zones.getTerritory(zoneChunkX, zoneChunkZ + 2).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX, zoneChunkZ + 2).getString("team").toString())) == invader))
+                    !((!zones.getTerritory(zoneChunkX - 2, zoneChunkZ).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX - 2, zoneChunkZ).get("team").toString())) == invader) ||
+                    (!zones.getTerritory(zoneChunkX + 2, zoneChunkZ).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX + 2, zoneChunkZ).get("team").toString())) == invader) ||
+                    (!zones.getTerritory(zoneChunkX, zoneChunkZ - 2).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX, zoneChunkZ - 2).get("team").toString())) == invader) ||
+                    (!zones.getTerritory(zoneChunkX, zoneChunkZ + 2).isEmpty() && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX, zoneChunkZ + 2).get("team").toString())) == invader))
         ) {
-            plugin.getComponentLogger().warn("The territory is not adjacent to one of the attacker's territories!");
+            initiator.sendMessage(MiniMessage.miniMessage().deserialize("<red>The territory is not adjacent to one of your territories!"));
+            return;
+        }
+        int numDefendingPlayers = 0;
+        for (Object obj : teams.getTeamMembers(defender)) {
+            Player player = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj).getString("uuid")));
+            if (player != null && player.isOnline()) {
+                numDefendingPlayers++;
+            }
+        }
+        if (numDefendingPlayers < 1) {
+            initiator.sendMessage(MiniMessage.miniMessage().deserialize("<red>The defending team does not have any players online!"));
             return;
         }
 
@@ -122,14 +134,19 @@ public class ClaimZoneEventManager {
                 ClaimZoneCooldown cooldown = new ClaimZoneCooldown(plugin, teams, invader);
                 cooldown.startCooldown();
             }
-            else if (outcome == EventOutcome.FAILURE) {
-                // Reset timer
+            else {
                 teams.getTeamMembers(invader).forEach(obj -> {
                     Player player = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj).getString("uuid")));
                     if (player != null && player.isOnline()) {
-                        player.sendMessage(MiniMessage.miniMessage().deserialize("<red>You have lost the advantage, the timer has been reset."));
-                        player.playSound(net.kyori.adventure.sound.Sound.sound(Key.key("entity.wither.block_break"), net.kyori.adventure.sound.Sound.Source.NEUTRAL, 1, 1));
-                        player.sendActionBar(MiniMessage.miniMessage().deserialize("<red>Advantage lost!"));
+                        player.sendMessage(MiniMessage.miniMessage().deserialize("<red>You do not have a sufficient advantage! (2 players needed)"));
+                        player.setGlowing(false);
+                    }
+                });
+                teams.getTeamMembers(invader).forEach(obj -> {
+                    Player player = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj).getString("uuid")));
+                    if (player != null && player.isOnline()) {
+                        player.sendMessage(MiniMessage.miniMessage().deserialize("<green>The invading team does not have a sufficient advantage."));
+                        player.setGlowing(false);
                     }
                 });
             }

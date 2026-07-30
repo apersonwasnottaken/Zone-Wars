@@ -85,6 +85,7 @@ public class ClaimZone {
                             "You must hold the territory for <green>" + secondsRemaining + "</green> more seconds!"
                     ));
                     player.playSound(net.kyori.adventure.sound.Sound.sound(Key.key("ui.button.click"), net.kyori.adventure.sound.Sound.Source.NEUTRAL, 1, 1));
+                    player.setGlowing(true);
                 }
             });
 
@@ -113,11 +114,24 @@ The territory at <yellow>(%d, %d)</yellow> is being raided by another team!
             if (teamInTerritory.get(UUID.fromString(zone.get("team").toString())) != null) {
                 defendingPlayers = teamInTerritory.get(UUID.fromString(zone.get("team").toString()));
             }
+            if (defendingPlayers < 1) fail();
             if (!teamInTerritory.containsKey(teams.getTeamUUID(invader))) fail();
             for (Map.Entry<UUID, Integer> team : teamInTerritory.entrySet()) {
-                plugin.getComponentLogger().info(String.valueOf(team.getValue()));
-                if (team.getValue() - 2 + 1 < defendingPlayers) {
-                    fail();
+                if (team.getValue() - 1 < defendingPlayers) {
+                    teams.getTeamMembers(invader).forEach(obj -> {
+                        Player player = plugin.getServer().getPlayer(UUID.fromString(((JSONObject) obj).getString("uuid")));
+                        if (player != null && player.isOnline()) {
+                            player.sendMessage(MiniMessage.miniMessage().deserialize(
+                                    "<red>You lost the advantage! The timer has been reset."
+                            ));
+                        }
+                    });
+                    if (zone.getBoolean("capital")) {
+                        secondsRemaining = (int) (60 * 5 + (double) (25 * (zones.getTeamTerritoryCount(defender) / zones.getDefaultTerritoryAmount())));
+                    }
+                    else {
+                        secondsRemaining = 120;
+                    }
                 }
             }
         }, 0L, 20L);

@@ -14,8 +14,6 @@ import org.json.JSONObject;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.IntStream;
 
 public class Zones {
     // Zone size: 2x2 chunks
@@ -304,6 +302,22 @@ public class Zones {
             }
         }
         return false;
+    }
+
+    public void createCapital(int teamIdx, Location location) {
+        for (int i = 0; i < territories.length(); i++) {
+            JSONObject territory = territories.getJSONObject(i);
+            if (territory.getString("world").equals(location.getWorld().getName())
+                    && teams.getTeamIndexFromUUID(UUID.fromString(territory.get("team").toString())) == teamIdx
+                    && territory.getInt("chunk_region_x") == findTerritoryFromLocation(location).getInt("chunk_region_x")
+                    && territory.getInt("chunk_region_z") == findTerritoryFromLocation(location).getInt("chunk_region_z")) {
+                territory.put("capital", true);
+                territories.put(i, territory);
+                updateTerritories();
+                rebuildTerritoryCache();
+                return;
+            }
+        }
     }
 
     public boolean removeCapital(int teamIdx) {

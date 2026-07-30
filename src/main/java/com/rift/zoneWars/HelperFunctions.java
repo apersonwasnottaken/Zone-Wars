@@ -4,7 +4,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 
-public class GetZoneBorderBlockLocation {
+public class HelperFunctions {
     public static Location findClosestAirOnSolidBlock(World world, int x, int z, int playerY, int radius) {
         int minY = world.getMinHeight();
         int maxY = world.getMaxHeight() - 1;

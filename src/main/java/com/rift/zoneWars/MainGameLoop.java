@@ -1,7 +1,7 @@
 package com.rift.zoneWars;
 
 import com.rift.zoneWars.zone.Zones;
-import com.rift.zoneWars.zone.claimZone.ClaimZoneEventManager;
+import io.papermc.paper.scoreboard.numbers.NumberFormat;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.*;
@@ -11,9 +11,11 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scoreboard.*;
+import org.bukkit.util.Vector;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.text.DecimalFormat;
 import java.util.*;
 
 public class MainGameLoop {
@@ -22,20 +24,44 @@ public class MainGameLoop {
     private final PluginData pluginData;
     private final Zones zones;
     private final Teams teams;
-    private final ClaimZoneEventManager claimZoneEventManager;
 
-    public MainGameLoop(ZoneWars plugin, PluginData pluginData, Zones zones, Teams teams, ClaimZoneEventManager claimZoneEventManager) {
+    public MainGameLoop(ZoneWars plugin, PluginData pluginData, Zones zones, Teams teams) {
         this.plugin = plugin;
         this.pluginData = pluginData;
         this.zones = zones;
         this.teams = teams;
-        this.claimZoneEventManager = claimZoneEventManager;
+    }
+
+    public void pushback(Player player) {
+        if (!zones.findTerritoryFromLocation(player.getLocation()).has("chunk_region_x") || !zones.findTerritoryFromLocation(player.getLocation()).has("chunk_region_z")) return;
+        if (Objects.equals(zones.findTerritoryFromLocation(player.getLocation()).get("team").toString(), "-1")) return;
+        int teamID = teams.getTeamIndexFromPlayer(player.getUniqueId());
+        int zoneChunkX = zones.findTerritoryFromLocation(player.getLocation()).getInt("chunk_region_x");
+        int zoneChunkZ = zones.findTerritoryFromLocation(player.getLocation()).getInt("chunk_region_z");
+        if (player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR || player.isOp()) return;
+        if (
+                !((!zones.getTerritory(zoneChunkX - 2, zoneChunkZ).isEmpty() && !Objects.equals(zones.getTerritory(zoneChunkX - 2, zoneChunkZ).get("team").toString(), "-1") && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX - 2, zoneChunkZ).get("team").toString())) == teamID) ||
+                (!zones.getTerritory(zoneChunkX + 2, zoneChunkZ).isEmpty() && !Objects.equals(zones.getTerritory(zoneChunkX + 2, zoneChunkZ).get("team").toString(), "-1") && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX + 2, zoneChunkZ).get("team").toString())) == teamID) ||
+                (!zones.getTerritory(zoneChunkX, zoneChunkZ - 2).isEmpty() && !Objects.equals(zones.getTerritory(zoneChunkX, zoneChunkZ - 2).get("team").toString(), "-1") && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX, zoneChunkZ - 2).get("team").toString())) == teamID) ||
+                (!zones.getTerritory(zoneChunkX, zoneChunkZ + 2).isEmpty() && !Objects.equals(zones.getTerritory(zoneChunkX, zoneChunkZ + 2).get("team").toString(), "-1") && teams.getTeamIndexFromUUID(UUID.fromString(zones.getTerritory(zoneChunkX, zoneChunkZ + 2).get("team").toString())) == teamID))
+        ) {
+            player.sendMessage(MiniMessage.miniMessage().deserialize("<red>You cannot go any further!"));
+            Vector pushAway;
+            if (Objects.equals(teams.getTeamName(teams.getTeamIndexFromPlayer(player.getUniqueId())), "Team Red")) {
+                pushAway = new Vector(0.2, 0.2, 0);
+            }
+            else {
+                pushAway = new Vector(-0.2, 0.2, 0);
+            }
+            player.setVelocity(pushAway);
+        }
     }
 
     public void startGameLoop() {
         plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
-            List<List<Integer>> alreadyDrawn = new ArrayList<>();
             for (Player player : plugin.getServer().getOnlinePlayers()) {
+                pushback(player);
+                List<List<Integer>> alreadyDrawn = new ArrayList<>();
                 // Every (200 / amount of teams) pieces of land = 1/2 a heart
                 if (zones.getDefaultTerritoryAmount() > 0) {
                     int maxHealth = zones.getMaxHealth(player);
@@ -90,76 +116,34 @@ public class MainGameLoop {
                         int step = 4;
                         for (double x = minX; x <= maxX; x += step) {
                             assert world != null;
-                            loc = GetZoneBorderBlockLocation.findClosestAirOnSolidBlock(world, (int) x, (int) minZ, (int) player.getY(), 5);
+                            loc = HelperFunctions.findClosestAirOnSolidBlock(world, (int) x, (int) minZ, (int) player.getY(), 5);
                             if (loc != null) {
                                 loc.add(0.5, 1, 0.5);
-                                world.spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, dustOptions);
+                                player.spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, dustOptions);
                             }
-                            loc = GetZoneBorderBlockLocation.findClosestAirOnSolidBlock(world, (int) x, (int) maxZ, (int) player.getY(), 5);
+                            loc = HelperFunctions.findClosestAirOnSolidBlock(world, (int) x, (int) maxZ, (int) player.getY(), 5);
                             if (loc != null) {
                                 loc.add(0.5, 1, 0.5);
-                                world.spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, dustOptions);
+                                player.spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, dustOptions);
                             }
                         }
                         for (double z = minZ; z <= maxZ; z += step) {
                             assert world != null;
-                            loc = GetZoneBorderBlockLocation.findClosestAirOnSolidBlock(world, (int) minX, (int) z, (int) player.getY(), 5);
+                            loc = HelperFunctions.findClosestAirOnSolidBlock(world, (int) minX, (int) z, (int) player.getY(), 5);
                             if (loc != null) {
                                 loc.add(0.5, 1, 0.5);
-                                world.spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, dustOptions);
+                                player.spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, dustOptions);
                             }
-                            loc = GetZoneBorderBlockLocation.findClosestAirOnSolidBlock(world, (int) maxX, (int) z, (int) player.getY(), 5);
+                            loc = HelperFunctions.findClosestAirOnSolidBlock(world, (int) maxX, (int) z, (int) player.getY(), 5);
                             if (loc != null) {
                                 loc.add(0.5, 1, 0.5);
-                                world.spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, dustOptions);
+                                player.spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, dustOptions);
                             }
                         }
                         alreadyDrawn.add(List.of(tx, tz));
                     }
                 }
             }
-            // Claiming territory (Needs Testing)
-            for (JSONObject territory : zones.getAllTerritoryOccupiedByAPlayer()) {
-                if (territory.isEmpty()) continue;
-                Map<UUID, Integer> teamInTerritory = new HashMap<>();
-                for (Player player : zones.getPlayersInTerritory(territory.getInt("chunk_region_x"), territory.getInt("chunk_region_z"))) {
-                    if (teams.getTeamIndexFromPlayer(player.getUniqueId()) == -1) continue;
-                    if (teamInTerritory.containsKey(teams.getTeamUUID(teams.getTeamIndexFromPlayer(player.getUniqueId())))) {
-                        teamInTerritory.put(teams.getTeamUUID(teams.getTeamIndexFromPlayer(player.getUniqueId())), teamInTerritory.get(teams.getTeamUUID(teams.getTeamIndexFromPlayer(player.getUniqueId()))) + 1);
-                    }
-                    else {
-                        teamInTerritory.put(teams.getTeamUUID(teams.getTeamIndexFromPlayer(player.getUniqueId())), 1);
-                    }
-                }
-                if (Objects.equals(territory.get("team").toString(), "-1")) {
-                    continue;
-                }
-                if (teams.getTeamIndexFromUUID(UUID.fromString(territory.get("team").toString())) < 0) {
-                    continue;
-                }
-                if (teamInTerritory.get(UUID.fromString(territory.get("team").toString())) == null) {
-                    continue;
-                }
-                int defendingPlayers = teamInTerritory.get(UUID.fromString(territory.get("team").toString()));
-                Object teamObj = territory.get("team");
-                if (teamObj == null || Objects.equals(teamObj.toString(), "-1")) continue;
-                int teamIndex = teams.getTeamIndexFromUUID(UUID.fromString(teamObj.toString()));
-                if (teamIndex == -1) continue;
-                List<?> members = teams.getTeamMembers(teamIndex).toList();
-                long onlineDefendingTeamMembers = members.stream()
-                        .map(obj -> ((java.util.Map<?, ?>) obj).get("uuid").toString())
-                        .map(uuidStr -> plugin.getServer().getPlayer(UUID.fromString(uuidStr)))
-                        .filter(player -> player != null && player.isOnline())
-                        .count();
-                for (Map.Entry<UUID, Integer> team : teamInTerritory.entrySet()) {
-                    if (team.getValue() - 1 >= defendingPlayers && onlineDefendingTeamMembers > 0) {
-                        // Start a claim
-                        claimZoneEventManager.startNewClaim(teams, teams.getTeamIndexFromUUID(team.getKey()), territory.getInt("team"), territory);
-                        break;
-                    }
-                }
-            }
-
         }, 0L, 10L);
         startScoreboardLoop();
     }
@@ -232,7 +216,7 @@ public class MainGameLoop {
                         scoreboardLines.add(noZones2);
                     }
                     else {
-                        scoreboardLines.add(miniMessage.deserialize("Claimed Zones: <aqua>" + zones.getTeamTerritories(teamIdx).length() + "</aqua>/<dark_aqua>" + (zones.getTerritories().length() - 4) + "</dark_aqua> (<dark_green>" + ((float) zones.getTeamTerritories(teamIdx).length() / (zones.getTerritories().length() - 4)) * 100 + "%</dark_green>)"));
+                        scoreboardLines.add(miniMessage.deserialize("Claimed Zones: <aqua>" + zones.getTeamTerritories(teamIdx).length() + "</aqua>/<dark_aqua>" + (zones.getTerritories().length() - 4) + "</dark_aqua> (<dark_green>" + new DecimalFormat("#.##").format(((float) zones.getTeamTerritories(teamIdx).length() / (zones.getTerritories().length() - 4)) * 100) + "%</dark_green>)"));
                         scoreboardLines.add(miniMessage.deserialize("Capitals: " + (!zones.getCapitalTerritories(teamIdx).isEmpty() ? "<green>" : "<red>") + zones.getCapitalTerritories(teamIdx).length()));
                         if (zones.getCapitalTerritories(teamIdx).length() > 0) {
                             scoreboardLines.add(blank);
@@ -248,11 +232,9 @@ public class MainGameLoop {
                         JSONObject playerTeam = (JSONObject) teamsConfigCache.get(teamIdx);
                         playerTeam.getJSONArray("members").forEach(obj1 -> {
                             JSONObject memberObj = (JSONObject) obj1;
-                            boolean online = false;
-                            Player targetPlayer = plugin.getServer().getPlayer(UUID.fromString(memberObj.getString("uuid")));
-                            if (targetPlayer != null) {
-                                online = targetPlayer.isOnline();
-                            }
+                            boolean online;
+                            OfflinePlayer targetPlayer = plugin.getServer().getOfflinePlayer(UUID.fromString(memberObj.getString("uuid")));
+                            online = targetPlayer.isOnline();
                             scoreboardLines.add(MiniMessage.miniMessage().deserialize(
                                     "    " + (online ? "<green>" : "<gray>") + memberObj.getString("username") + (!online ? " (Offline)" : "")
                             ));
@@ -275,7 +257,7 @@ public class MainGameLoop {
                         Score score = objective.getScore(entryKey);
                         score.setScore(scoreboardLines.size() - i);
 
-                        score.numberFormat(io.papermc.paper.scoreboard.numbers.NumberFormat.fixed(Component.empty()));
+                        score.numberFormat(NumberFormat.fixed(Component.empty()));
                     } else {
                         team.prefix(Component.empty());
                         scoreboard.resetScores(entryKey);

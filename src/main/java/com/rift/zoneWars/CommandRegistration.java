@@ -41,8 +41,9 @@ public class CommandRegistration {
     private final Teams teams;
     private final PluginData pluginData;
     private final ClaimZoneEventManager claimZoneEventManager;
+    private final MoveCapitalCooldownManager moveCapitalCooldownManager;
 
-    public CommandRegistration(ZoneWars plugin, LifecycleEventManager<Plugin> lifecycleEventManager, Zones zones, Teams teams, PluginData pluginData, ClaimZoneEventManager claimZoneEventManager) {
+    public CommandRegistration(ZoneWars plugin, LifecycleEventManager<Plugin> lifecycleEventManager, Zones zones, Teams teams, PluginData pluginData, ClaimZoneEventManager claimZoneEventManager, MoveCapitalCooldownManager moveCapitalCooldownManager) {
         this.plugin = plugin;
         this.lifecycleEventManager = lifecycleEventManager;
         this.logger = plugin.getComponentLogger();
@@ -50,6 +51,7 @@ public class CommandRegistration {
         this.teams = teams;
         this.pluginData = pluginData;
         this.claimZoneEventManager = claimZoneEventManager;
+        this.moveCapitalCooldownManager = moveCapitalCooldownManager;
     }
 
     public void registerCommand(LifecycleEventManager<Plugin> lifecycleEventManager) {
@@ -110,7 +112,7 @@ Is team capital? %s
                                                     logger.warn("Command must be executed by a player!");
                                                     return -1;
                                                 }
-                                                claimZoneEventManager.startNewClaim(teams, teams.getTeamIndexFromUUID(ctx.getArgument("invading_team", UUID.class)), teams.getTeamIndexFromUUID(ctx.getArgument("defending_team", UUID.class)), zones.findTerritoryFromLocation(ctx.getSource().getLocation()));
+                                                claimZoneEventManager.startNewClaim(teams, teams.getTeamIndexFromUUID(ctx.getArgument("invading_team", UUID.class)), teams.getTeamIndexFromUUID(ctx.getArgument("defending_team", UUID.class)), zones.findTerritoryFromLocation(ctx.getSource().getLocation()), ctx.getSource().getExecutor());
                                                 return Command.SINGLE_SUCCESS;
                                             })
                                     )
@@ -297,6 +299,7 @@ Is team capital? %s
                                 teams.updateTeams();
                                 zones.updateTerritories();
                                 plugin.getMainGameLoop().updateTeamCache();
+                                claimZoneEventManager.clearAllEvents();
                                 ctx.getSource().getExecutor().sendMessage(MiniMessage.miniMessage().deserialize("<green>Plugin reloaded successfully!"));
                                 return Command.SINGLE_SUCCESS;
                             }))
@@ -323,6 +326,36 @@ Is team capital? %s
                                 player.sendMessage(MiniMessage.miniMessage().deserialize("Territory particles set to: <bold>" + (player.getPersistentDataContainer().get(particlesKey, PersistentDataType.BOOLEAN) ? "<green>ON" : "<red>OFF")));
                                 return Command.SINGLE_SUCCESS;
                             }))
+                    .then(Commands.literal("start_claim")
+                            .executes(ctx -> {
+                                if (!(ctx.getSource().getExecutor() instanceof Player player)) {
+                                    logger.warn("Command must be executed by a player!");
+                                    return 1;
+                                }
+                                claimZoneEventManager.startNewClaim(teams, teams.getTeamIndexFromPlayer(player.getUniqueId()), teams.getTeamIndexFromUUID(UUID.fromString(zones.findTerritoryFromLocation(ctx.getSource().getLocation()).get("team").toString())), zones.findTerritoryFromLocation(ctx.getSource().getLocation()), ctx.getSource().getExecutor());
+                                return Command.SINGLE_SUCCESS;
+                            }))
+                    /*
+                    .then(Commands.literal("move_capital")
+                            .executes(ctx -> {
+                                if (!(ctx.getSource().getExecutor() instanceof Player player)) {
+                                    logger.warn("Command must be executed by a player!");
+                                    return 1;
+                                }
+                                player = (Player) ctx.getSource().getExecutor();
+                                int teamIdx = teams.getTeamIndexFromPlayer(player.getUniqueId());
+                                if (moveCapitalCooldownManager.getCooldown(teams.getTeamUUID(teamIdx)) / 1000 < 600) {
+                                    player.sendMessage(MiniMessage.miniMessage().deserialize("<red>You must wait " + Math.floor(moveCapitalCooldownManager.getCooldown(teams.getTeamUUID(teamIdx)) / 1000) + " more seconds!"));
+                                    return;
+                                }
+                                zones.removeCapital(teamIdx);
+                                zones.createCapital(teamIdx, player.getLocation());
+                                moveCapitalCooldownManager.startCooldown(teams.getTeamUUID(teams.getTeamIndexFromPlayer(player.getUniqueId())));
+                                player.sendMessage(MiniMessage.miniMessage().deserialize("<green>Moved successfully!"));
+                                return Command.SINGLE_SUCCESS;
+                            }))
+
+                     */
                     .build();
             commands.registrar().register(buildCommand, "Commands for Zone Wars gimmick", List.of("zw", "zwars"));
         });

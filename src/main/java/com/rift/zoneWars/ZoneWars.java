@@ -37,7 +37,9 @@ public final class ZoneWars extends JavaPlugin {
     private Teams teams;
     private Zones zones;
     private MainGameLoop mainGameLoop;
+    private DeathInterceptorListener deathInterceptorListener;
     private ClaimZoneEventManager claimZoneEventManager;
+    private MoveCapitalCooldownManager moveCapitalCooldownManager;
 
     @Override
     public void onEnable() {
@@ -45,11 +47,14 @@ public final class ZoneWars extends JavaPlugin {
         pluginData = new PluginData(this);
         teams = new Teams(this, pluginData);
         zones = new Zones(this, pluginData, teams);
+        moveCapitalCooldownManager = new MoveCapitalCooldownManager(teams);
         claimZoneEventManager = new ClaimZoneEventManager(this, zones);
-        mainGameLoop = new MainGameLoop(this, pluginData, zones, teams, claimZoneEventManager);
+        deathInterceptorListener = new DeathInterceptorListener(teams, zones);
+        this.getServer().getPluginManager().registerEvents(deathInterceptorListener, this);
+        mainGameLoop = new MainGameLoop(this, pluginData, zones, teams);
         mainGameLoop.startGameLoop();
 
-        commandRegistration = new CommandRegistration(this, this.getLifecycleManager(), zones, teams, pluginData, claimZoneEventManager);
+        commandRegistration = new CommandRegistration(this, this.getLifecycleManager(), zones, teams, pluginData, claimZoneEventManager, moveCapitalCooldownManager);
         commandRegistration.registerCommand(this.getLifecycleManager());
     }
 
